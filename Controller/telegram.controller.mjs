@@ -273,8 +273,9 @@ const onCallBackQuery = async (callback) => {
             });
             const rate = resData.data.EUR
             const rateInBTC = total / rate
-            const orderId = Math.floor(new Date().getTime()/1000)
-            const response = await createPaymentLink(chat_id, rateInBTC, `${process.env.SERVER}/payment/callback`, orderId)
+            const orderId = Math.floor(new Date().getTime() / 1000)
+            const cartId = cart[0]._id
+            const response = await createPaymentLink(chat_id, rateInBTC, `${process.env.SERVER}/payment/callback/${cartId}`, orderId)
             if (response.result == 100 && response.message == "success") {
                 const trackId = response.trackId
                 const text = `<b>📃 Your order <code>#${orderId}</code> is created:\nTotal: 💵 ${total} ${cart[0].product[0].currency}</b>`
