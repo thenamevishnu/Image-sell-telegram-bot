@@ -13,13 +13,13 @@ const paymentCallback = async (req, res) => {
             if (postData.type === "payment") {
                 const status = postData.status
                 if (status === "Waiting") {
-                    return await Bot.sendMessage(postData.description, "🕛 Waiting for payment...") 
+                    return await Bot.sendMessage(postData.description, `🕛 (<code>#${postData.orderId}</code>) Waiting for payment...`) 
                 }
                 if (status === "Confirming") {
-                    return await Bot.sendMessage(postData.description, "🕛 Awaiting blockchain network confirmation.")
+                    return await Bot.sendMessage(postData.description, `🕛 <code>#${postData.orderId}</code>) Awaiting blockchain network confirmation.`)
                 }
                 if (status === "Paid") {
-                    return await Bot.sendMessage(postData.description, "✅ Payment is confirmed")
+                    return await Bot.sendMessage(postData.description, `✅ <code>#${postData.orderId}</code>) Payment is confirmed`)
                 }
             }
         } else {
