@@ -35,21 +35,10 @@ const paymentCallback = async (req, res) => {
                     const image = cart[0].product[0].image
                     const name = cart[0].product[0].name
                     const Qty = cart[0].qty
-                    await Bot.sendMessage(postData.description, `✅ Order <code>#${orderId}</code>\n📦 ${name}\n🛒 Qty: ${Qty}\n${image}`, {
-                        parse_mode: "HTML"
-                    })
-                    const payment = {
-                        amount: postData.amount,
-                        currency: postData.currency,
-                        orderId: postData.orderId,
-                        date: postData.date,
-                        trackId: postData.trackId
-                    }
-                    await orderDB.create({
-                        user_id: postData.description,
-                        product_id: cart[0].product_id,
-                        qty: Qty,
-                        payment
+                    await Bot.sendPhoto(postData.description, image, {
+                        caption: `✅ Order <code>#${orderId}</code>\n📦 ${name}\n🛒 Qty: ${Qty}\n${image}`,
+                        parse_mode: "HTML",
+                        disable_web_page_preview: true
                     })
                     return await Bot.sendMessage(postData.description, `🕛 (<code>#${postData.orderId}</code>) ${cartId} Waiting for payment...`, {
                         parse_mode: "HTML"
