@@ -13,7 +13,7 @@ const app = express()
 
 cron.schedule("* * * * *", () => {
     axios.get(process.env.SERVER).then(({data: response}) => {
-        
+        console.log(response)
     }).catch(err => {
         console.log(err.message)
     })
