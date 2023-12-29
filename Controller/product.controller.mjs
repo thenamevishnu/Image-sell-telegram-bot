@@ -22,7 +22,6 @@ const cartManage = async (req, res) => {
         }
         res.status(200).send({status: true, message: "Updated"})
     } catch (err) {
-        console.log(err);
         return res.status(500).send({message: "Internal server error"})
     }
 }
@@ -33,7 +32,6 @@ const deleteItem = async (req, res) => {
         await cartDB.deleteOne({ user_id: user_id, product_id: product_id })
         res.status(200).send({status: true, message: "success"})
     } catch (err) {
-        console.log(err);
         return res.status(500).send({message: "Internal server error"})
     }
 }

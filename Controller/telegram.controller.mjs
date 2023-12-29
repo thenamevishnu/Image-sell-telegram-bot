@@ -30,7 +30,7 @@ const start = async (msg) => {
             }
         })
     } catch(err) {
-        console.log(err.message)
+       
     }
 }
 
@@ -48,7 +48,7 @@ const shop = async (msg) => {
             }
         })
     } catch (err) {
-        console.log(err.message)
+       
     }
 }
 
@@ -86,7 +86,7 @@ const cart = async (msg) => {
             }
         })
     } catch (err) {
-        console.log(err)
+       
     }
 }
 
@@ -294,7 +294,7 @@ const onCallBackQuery = async (callback) => {
         }
 
     } catch (err) {
-        console.log(err)
+       
     }
 
 }

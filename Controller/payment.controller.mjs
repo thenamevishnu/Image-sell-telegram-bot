@@ -3,6 +3,7 @@ import crypto from "crypto"
 import Bot from "../Telegram/Config.mjs"
 import { Types } from "mongoose"
 import { cartDB } from "../Models/cart.model.mjs"
+import { orderDB } from "../Models/orders.model.mjs"
 env.config()
 
 const paymentCallback = async (req, res) => {
@@ -30,18 +31,37 @@ const paymentCallback = async (req, res) => {
                             }
                         }
                     ])
-                    console.log(cart);
+                    const orderId = postData.orderId
+                    const image = cart[0].product[0].image
+                    const name = cart[0].product[0].name
+                    const Qty = cart[0].qty
+                    await Bot.sendMessage(postData.description, `✅ Order <code>#${orderId}</code>\n📦 ${name}\n🛒 Qty: ${Qty}\n${image}`, {
+                        parse_mode: "HTML"
+                    })
+                    const payment = {
+                        amount: postData.amount,
+                        currency: postData.currency,
+                        orderId: postData.orderId,
+                        date: postData.date,
+                        trackId: postData.trackId
+                    }
+                    await orderDB.create({
+                        user_id: postData.description,
+                        product_id: cart[0].product_id,
+                        qty: Qty,
+                        payment
+                    })
                     return await Bot.sendMessage(postData.description, `🕛 (<code>#${postData.orderId}</code>) ${cartId} Waiting for payment...`, {
                         parse_mode: "HTML"
                     }) 
                 }
                 if (status === "Confirming") {
-                    return await Bot.sendMessage(postData.description, `🕛 <code>#${postData.orderId}</code>) Awaiting blockchain network confirmation.`, {
+                    return await Bot.sendMessage(postData.description, `🕛 (<code>#${postData.orderId}</code>) Awaiting blockchain network confirmation.`, {
                         parse_mode: "HTML"
                     })
                 }
                 if (status === "Paid") {
-                    await Bot.sendMessage(postData.description, `✅ <code>#${postData.orderId}</code>) Payment is confirmed`, {
+                    await Bot.sendMessage(postData.description, `✅ (<code>#${postData.orderId}</code>) Payment is confirmed`, {
                         parse_mode: "HTML"
                     })
                     const cart = await cartDB.aggregate([
@@ -58,14 +78,33 @@ const paymentCallback = async (req, res) => {
                             }
                         }
                     ])
-                    console.log(cart);
+                    const orderId = postData.orderId
+                    const image = cart[0].product[0].image
+                    const name = cart[0].product[0].name
+                    const Qty = cart[0].qty
+                    await Bot.sendMessage(postData.description, `✅ Order <code>#${orderId}</code>\n📦 ${name}\n🛒 Qty: ${Qty}\n${image}`, {
+                        parse_mode: "HTML"
+                    })
+                    const payment = {
+                        amount: postData.amount,
+                        currency: postData.currency,
+                        orderId: postData.orderId,
+                        date: postData.date,
+                        trackId: postData.trackId
+                    }
+                    await orderDB.create({
+                        user_id: postData.description,
+                        product_id: cart[0].product_id,
+                        qty: Qty,
+                        payment
+                    })
+                    await cartDB.deleteOne({_id: new Types.ObjectId(cartId)})
                 }
             }
         } else {
             res.status(400).send({ message: "Invalid HMAC signature" })
         }
     } catch (err) {
-        console.log(err)
         res.status(500).send({message: "internal server error"})
     }
 }
