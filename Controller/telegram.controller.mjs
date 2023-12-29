@@ -436,7 +436,7 @@ const onCallBackQuery = async (callback) => {
                 })
             }
             const orderInfo = order[0]
-            const text = `<b>📦 ${orderInfo.product[0].weight}Kg ${orderInfo.product[0].name}\n🖼️ Image: ${orderInfo.product[0].image}\n🛒 Qty: <code>${orderInfo.qty}</code>\n💵 Total Amount: <code>${orderInfo.payment.amount} ${orderInfo.payment.currency}</code>\n📃 OrderId: <code>#${orderInfo.payment.orderId}</code>\n#️⃣ txID: <code>${orderInfo.payment.txID}</code>\n\nDate: <code>${new Date(orderInfo.payment.date * 1000).toUTCString()}</code></b>`
+            const text = `<b>📦 ${orderInfo.product[0].weight}Kg ${orderInfo.product[0].name}\n🌍 Location: ${orderInfo.product[0].location}\n🛒 Qty: <code>${orderInfo.qty}</code>\n💵 Total Amount: <code>${orderInfo.payment.amount} ${orderInfo.payment.currency}</code>\n📃 OrderId: <code>#${orderInfo.payment.orderId}</code>\n#️⃣ txID: <code>${orderInfo.payment.txID}</code>\n\nDate: <code>${new Date(orderInfo.payment.date * 1000).toUTCString()}</code></b>`
             await Bot.deleteMessage(chat_id, message_id)
             return Bot.sendPhoto(chat_id, orderInfo.product[0].image, {
                 caption: text,
