@@ -1,7 +1,6 @@
 import env from "dotenv"
 import crypto from "crypto"
 import Bot from "../Telegram/Config.mjs"
-
 env.config()
 
 const paymentCallback = async (req, res) => {
@@ -14,7 +13,13 @@ const paymentCallback = async (req, res) => {
             if (postData.type === "payment") {
                 const status = postData.status
                 if (status === "Waiting") {
-                    console.log(JSON.stringify(postData))
+                    return await Bot.sendMessage(postData.description, "🕛 Waiting for payment...") 
+                }
+                if (status === "Confirming") {
+                    return await Bot.sendMessage(postData.description, "🕛 Awaiting blockchain network confirmation.")
+                }
+                if (status === "Paid") {
+                    return await Bot.sendMessage(postData.description, "✅ Payment is confirmed")
                 }
             }
         } else {
