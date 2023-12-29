@@ -17,7 +17,7 @@ const paymentCallback = async (req, res) => {
             if (postData.type === "payment") {
                 const status = postData.status
                 if (status === "Waiting") {
-                    return await Bot.sendMessage(postData.description, `🕛 (<code>#${postData.orderId}</code>) ${cartId} Waiting for payment...`, {
+                    return await Bot.sendMessage(postData.description, `🕛 (<code>#${postData.orderId}</code>) Waiting for payment...`, {
                         parse_mode: "HTML"
                     }) 
                 }
