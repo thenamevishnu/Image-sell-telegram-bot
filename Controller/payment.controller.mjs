@@ -17,29 +17,6 @@ const paymentCallback = async (req, res) => {
             if (postData.type === "payment") {
                 const status = postData.status
                 if (status === "Waiting") {
-                    const cart = await cartDB.aggregate([
-                        {
-                            $match: {
-                                _id: new Types.ObjectId(cartId)
-                            }
-                        }, {
-                            $lookup: {
-                                from: "products",
-                                localField: "product_id",
-                                foreignField: "_id",
-                                as: "product"
-                            }
-                        }
-                    ])
-                    const orderId = postData.orderId
-                    const image = cart[0].product[0].image
-                    const name = cart[0].product[0].name
-                    const Qty = cart[0].qty
-                    await Bot.sendPhoto(postData.description, image, {
-                        caption: `✅ Order <code>#${orderId}</code>\n📦 ${name}\n🛒 Qty: ${Qty}\n${image}`,
-                        parse_mode: "HTML",
-                        disable_web_page_preview: true
-                    })
                     return await Bot.sendMessage(postData.description, `🕛 (<code>#${postData.orderId}</code>) ${cartId} Waiting for payment...`, {
                         parse_mode: "HTML"
                     }) 
@@ -70,8 +47,9 @@ const paymentCallback = async (req, res) => {
                     const orderId = postData.orderId
                     const image = cart[0].product[0].image
                     const name = cart[0].product[0].name
+                    const weight = cart[0].product[0].weight
                     const Qty = cart[0].qty
-                    await Bot.sendMessage(postData.description, `✅ Order <code>#${orderId}</code>\n📦 ${name}\n🛒 Qty: ${Qty}\n${image}`, {
+                    await Bot.sendMessage(postData.description, `✅ Order <code>#${orderId}</code>\n📦 ${weight}Kg ${name}\n🛒 Qty: ${Qty}\n${image}`, {
                         parse_mode: "HTML"
                     })
                     const payment = {
@@ -79,7 +57,8 @@ const paymentCallback = async (req, res) => {
                         currency: postData.currency,
                         orderId: postData.orderId,
                         date: postData.date,
-                        trackId: postData.trackId
+                        trackId: postData.trackId,
+                        txID: postData.txID
                     }
                     await orderDB.create({
                         user_id: postData.description,

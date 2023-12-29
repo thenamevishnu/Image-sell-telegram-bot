@@ -25,6 +25,9 @@ const order = new Schema({
         },
         trackId: {
             type: Number
+        },
+        txID: {
+            type: String
         }
     }
 }, {
