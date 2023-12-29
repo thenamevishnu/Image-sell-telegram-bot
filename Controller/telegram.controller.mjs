@@ -265,13 +265,13 @@ const onCallBackQuery = async (callback) => {
                 }
             ])
             const total = cart[0].product[0].price * cart[0].qty
-            const resData = await axios.get('https://api.coingecko.com/api/v3/simple/price', {
+            const resData = await axios.get('https://min-api.cryptocompare.com/data/price', {
                 params: {
-                    ids: 'bitcoin',
-                    vs_currencies: 'eur',
+                    fsym: 'BTC',
+                    tsyms: 'EUR',
                 },
             });
-            const rate = resData.data.bitcoin.eur
+            const rate = resData.data.EUR
             const rateInBTC = total / rate
             const orderId = Math.floor(new Date().getTime()/1000)
             const response = await createPaymentLink(chat_id, rateInBTC, `${process.env.SERVER}/payment/callback`, orderId)
