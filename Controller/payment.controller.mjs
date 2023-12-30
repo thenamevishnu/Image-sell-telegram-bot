@@ -45,7 +45,7 @@ const paymentCallback = async (req, res) => {
                         }
                     ])
                     const orderId = postData.orderId
-                    const image = cart[0].product[0].image
+                    const image = cart[0].product[0].location_image
                     const name = cart[0].product[0].name
                     const weight = cart[0].product[0].weight
                     const link = cart[0].product[0].link

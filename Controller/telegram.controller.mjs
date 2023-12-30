@@ -264,7 +264,7 @@ const onCallBackQuery = async (callback) => {
                 }
             ]]
             await Bot.deleteMessage(chat_id, message_id)
-            return await Bot.sendPhoto(chat_id, product.image, {
+            return await Bot.sendPhoto(chat_id, product.product_image, {
                 caption: text,
                 parse_mode: "HTML",
                 reply_markup: {
@@ -438,7 +438,7 @@ const onCallBackQuery = async (callback) => {
             const orderInfo = order[0]
             const text = `<b>📦 ${orderInfo.product[0].weight}Kg ${orderInfo.product[0].name}\n🌍 Location: ${orderInfo.product[0].location}\n🛒 Qty: <code>${orderInfo.qty}</code>\n💵 Total Amount: <code>${orderInfo.payment.amount} ${orderInfo.payment.currency}</code>\n📃 OrderId: <code>#${orderInfo.payment.orderId}</code>\n#️⃣ txID: <code>${orderInfo.payment.txID}</code>\n\nDate: <code>${new Date(orderInfo.payment.date * 1000).toUTCString()}</code></b>`
             await Bot.deleteMessage(chat_id, message_id)
-            return Bot.sendPhoto(chat_id, orderInfo.product[0].image, {
+            return Bot.sendPhoto(chat_id, orderInfo.product[0].location_image, {
                 caption: text,
                 parse_mode: "HTML",
                 disable_web_page_preview: true
@@ -574,7 +574,7 @@ const onCallBackQuery = async (callback) => {
                             })
                         }
                         productInfo.price = parseFloat(msg.text)
-                        await Bot.sendMessage(chat_id, `${JSON.stringify(productInfo)}\n\nSend photo only`, {
+                        await Bot.sendMessage(chat_id, `${JSON.stringify(productInfo)}\n\nSend product photo only`, {
                             parse_mode: "HTML"
                         })
                         Bot.once("message", async (msg) => {
@@ -583,8 +583,8 @@ const onCallBackQuery = async (callback) => {
                                     parse_mode: "HTML"
                                 })
                             }
-                            productInfo.image = msg.photo[0].file_id
-                            await Bot.sendMessage(chat_id, `${JSON.stringify(productInfo)}\n\nEnter location url`, {
+                            productInfo.product_image = msg.photo[0].file_id
+                            await Bot.sendMessage(chat_id, `${JSON.stringify(productInfo)}\n\nSend location photo only`, {
                                 parse_mode: "HTML"
                             })
                             Bot.once("message", async (msg) => {
@@ -593,12 +593,23 @@ const onCallBackQuery = async (callback) => {
                                         parse_mode: "HTML"
                                     })
                                 }
-                                productInfo.location = msg.text
-                                const findDoc = await productDB.findOne().sort({_id: -1})
-                                await productDB.create({ _id: findDoc._id + 1, name: productInfo.name, city: city.name, currency: "euro", weight: productInfo.weight, price: productInfo.price, image: productInfo.image, location: productInfo.location})
-                                await Bot.sendMessage(chat_id, `${JSON.stringify(productInfo)}\n\n✅ Product saved`, {
-                                    parse_mode: "HTML",
-                                    disable_web_page_preview: true
+                                productInfo.location_image = msg.photo[0].file_id
+                                await Bot.sendMessage(chat_id, `${JSON.stringify(productInfo)}\n\nEnter location url`, {
+                                    parse_mode: "HTML"
+                                })
+                                Bot.once("message", async (msg) => {
+                                    if (msg.text == "/cancel") {
+                                        return Bot.sendMessage(msg.chat.id, "<i>✖️ Cancelled</i>", {
+                                            parse_mode: "HTML"
+                                        })
+                                    }
+                                    productInfo.location = msg.text
+                                    const findDoc = await productDB.findOne().sort({_id: -1})
+                                    await productDB.create({ _id: findDoc ? findDoc._id + 1 : 1, product_image: productInfo.product_image, location_image: productInfo.location_image, city: city.name, currency: "euro", weight: productInfo.weight, price: productInfo.price, name: productInfo.name, location: productInfo.location})
+                                    await Bot.sendMessage(chat_id, `${JSON.stringify(productInfo)}\n\n✅ Product saved`, {
+                                        parse_mode: "HTML",
+                                        disable_web_page_preview: true
+                                    })
                                 })
                             })
                         })

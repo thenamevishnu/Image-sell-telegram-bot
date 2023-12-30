@@ -23,7 +23,10 @@ const product = new Schema({
         type: Boolean,
         default: true
     },
-    image: {
+    product_image: {
+        type: String
+    },
+    location_image: {
         type: String
     },
     location: {
