@@ -81,7 +81,7 @@ const cart = async (msg) => {
         }
         const text = `🛒 Your cart: ${cart.length} items`
         const key = cart.map(item => {
-            return [{text: `${item.product[0].name} (Qty: ${item.qty})`, callback_data: `/view ${item.product_id}`},{text: "❌", callback_data: `/remove_cart ${item.product_id}`}]
+            return [{ text: `${item.product[0].name} (Qty: ${item.qty})`, callback_data: `0` }, {text: "Checkout 🎯", callback_data: `/view ${item.product_id}`}, {text: "❌", callback_data: `/remove_cart ${item.product_id}`}]
         })
         return await Bot.sendMessage(chat_id, text, {
             parse_mode: "HTML",
