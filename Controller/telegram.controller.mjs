@@ -699,7 +699,9 @@ const onCallBackQuery = async (callback) => {
                 })
                 Bot.once("message", async (msg) => {
                     if (msg.text == "/cancel") {
-                        return await Bot.sendMessage(chat_id, "<i>✖️ Cancelled!</i>")
+                        return await Bot.sendMessage(chat_id, "<i>✖️ Cancelled!</i>", {
+                            parse_mode: "HTML"
+                        })
                     }
                     await productDB.updateOne({ _id: pid }, { $set: { name: msg.text } })
                     return await Bot.sendMessage(chat_id, "✅ Name updated")
@@ -714,7 +716,9 @@ const onCallBackQuery = async (callback) => {
                 })
                 Bot.once("message", async (msg) => {
                     if (msg.text == "/cancel") {
-                        return await Bot.sendMessage(chat_id, "<i>✖️ Cancelled!</i>")
+                        return await Bot.sendMessage(chat_id, "<i>✖️ Cancelled!</i>", {
+                            parse_mode: "HTML"
+                        })
                     }
                     await productDB.updateOne({ _id: pid }, { $set: { price: parseFloat(msg.text) } })
                     return await Bot.sendMessage(chat_id, "✅ Price updated")
@@ -729,7 +733,9 @@ const onCallBackQuery = async (callback) => {
                 })
                 Bot.once("message", async (msg) => {
                     if (msg.text == "/cancel") {
-                        return await Bot.sendMessage(chat_id, "<i>✖️ Cancelled!</i>")
+                        return await Bot.sendMessage(chat_id, "<i>✖️ Cancelled!</i>", {
+                            parse_mode: "HTML"
+                        })
                     }
                     const img = msg.photo[0].file_id
                     await productDB.updateOne({ _id: pid }, { $set: { product_image: img } })
@@ -745,7 +751,9 @@ const onCallBackQuery = async (callback) => {
                 })
                 Bot.once("message", async (msg) => {
                     if (msg.text == "/cancel") {
-                        return await Bot.sendMessage(chat_id, "<i>✖️ Cancelled!</i>")
+                        return await Bot.sendMessage(chat_id, "<i>✖️ Cancelled!</i>", {
+                            parse_mode: "HTML"
+                        })
                     }
                     const img = msg.photo[0].file_id
                     if (msg.caption) {
