@@ -4,7 +4,7 @@
     "description": "",
     "main": "app.mjs",
     "scripts": {
-        "test": "nodemon app.mjs"
+        "test": "node app.mjs"
     },
     "author": "",
     "license": "ISC",

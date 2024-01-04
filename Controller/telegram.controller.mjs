@@ -841,7 +841,7 @@ const onCallBackQuery = async (callback) => {
                             parse_mode: "HTML"
                         })
                     }
-                    const img = msg.photo[0].file_id
+                    const img = msg.photo?.[0]?.file_id
                     if (msg.caption) {
                         await productDB.updateOne({ _id: pid }, { $set: { location: msg.caption } })
                     }
