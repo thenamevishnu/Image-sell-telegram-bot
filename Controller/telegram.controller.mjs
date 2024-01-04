@@ -90,7 +90,7 @@ const cart = async (msg) => {
             }
         })
     } catch (err) {
-       
+       console.log(err);
     }
 }
 
@@ -133,7 +133,7 @@ const orders = async (msg) => {
 
 const support = async (msg) => {
     try {
-        const text = "<code>💬 Feel free to share your question in a single message.\n\nsend </code><code>/cancel</code><code> to cancel</code>"
+        const text = "<code>💬 Feel free to share your question in a single message.\n\nsend </code>/cancel<code> to cancel</code>"
         await Bot.sendMessage(msg.chat.id, text, {
             parse_mode: "HTML"
         })
@@ -176,7 +176,12 @@ const adminPanel = async (msg) => {
             [
                 { text: "➕ Add Country", callback_data: "/admin_add country" },
                 { text: "➕ Add City", callback_data: "/admin_add city" }
-            ], [
+            ],
+            [
+                { text: "📃 Country List", callback_data: "/admin_list country" },
+                { text: "📃 City List", callback_data: "/admin_list city" }
+            ],
+            [
                 { text: "➕ Add Product", callback_data: "/admin_add product" }
             ], [
                 {text: "👇 product List 👇", callback_data: "0"}
@@ -186,10 +191,7 @@ const adminPanel = async (msg) => {
             const keys = products.map(item => {
                 const items =  [
                     {
-                        text: `${item.weight}Kg ${item.name} - ${item.price} ${item.currency}`, callback_data: '0'
-                    },
-                    {
-                        text: `${item.active ? `✅ Active` : `❌ Disabled`}`, callback_data: `/status_change ${item._id} ${!item.active}`
+                        text: `${item.name} - ${item.price} ${item.currency}`, callback_data: `/admin_products ${item._id}`
                     }
                 ]
                 key.push(items)
@@ -239,7 +241,7 @@ const onCallBackQuery = async (callback) => {
             const text = `🏙️ ${city}\n◾◾◾◾◾\nSelect a product`
             const products = await productDB.find({city: city})
             const key = products.map(item => {
-                return [{text: `${item.active ? `✅` : `❌`} ${item.weight}Kg ${item.name} 💵 ${item.price} ${item.currency}`, callback_data: `/select_product ${item._id}`}]
+                return [{text: `${item.active ? `✅` : `❌`} ${item.name} 💵 ${item.price} ${item.currency}`, callback_data: `/select_product ${item._id}`}]
             })
             return await Bot.editMessageText(text, {
                 chat_id: chat_id,
@@ -257,7 +259,7 @@ const onCallBackQuery = async (callback) => {
             if (!product.active) {
                 return Bot.answerCallbackQuery(callback.id, "✖️ Product is not available!")
             }
-            const text = `🏙️ ${product.city}\n◾◾◾◾◾\n📦 ${product.weight}Kg ${product.name}\n💵 ${product.price} ${product.currency}\nℹ️ No description`
+            const text = `🏙️ ${product.city}\n◾◾◾◾◾\n📦 ${product.name}\n💵 ${product.price} ${product.currency}\nℹ️ No description`
             const key = [[
                 {
                     text:"➕ Add to cart", callback_data: `/addtocart ${product_id} 1`
@@ -357,7 +359,7 @@ const onCallBackQuery = async (callback) => {
             const key = [
                 [{text: "📃 Create Order", callback_data: `/create_order ${product_id}`}]
             ]
-            const text = `<b>📦 ${cart[0].product[0].weight}Kg ${cart[0].product[0].name} (${cart[0].qty}) * ${cart[0].product[0].price} = 💵 ${cart[0].product[0].price * cart[0].qty}\n◾◾◾◾◾◾◾◾◾◾\nTotal: ${cart[0].product[0].price * cart[0].qty} ${cart[0].product[0].currency}</b>`
+            const text = `<b>📦 ${cart[0].product[0].name} (${cart[0].qty}) * ${cart[0].product[0].price} = 💵 ${cart[0].product[0].price * cart[0].qty}\n◾◾◾◾◾◾◾◾◾◾\nTotal: ${cart[0].product[0].price * cart[0].qty} ${cart[0].product[0].currency}</b>`
             return await Bot.editMessageText(text, {
                 chat_id: chat_id,
                 message_id: message_id,
@@ -385,6 +387,9 @@ const onCallBackQuery = async (callback) => {
                     }
                 }
             ])
+            if (!cart[0].product[0].location) {
+                return await Bot.answerCallbackQuery(callback.id, "❌ No Drop were found in this product")
+            }
             const total = cart[0].product[0].price * cart[0].qty
             const resData = await axios.get('https://min-api.cryptocompare.com/data/price', {
                 params: {
@@ -436,7 +441,7 @@ const onCallBackQuery = async (callback) => {
                 })
             }
             const orderInfo = order[0]
-            const text = `<b>📦 ${orderInfo.product[0].weight}Kg ${orderInfo.product[0].name}\n🌍 Location: ${orderInfo.product[0].location}\n🛒 Qty: <code>${orderInfo.qty}</code>\n💵 Total Amount: <code>${orderInfo.payment.amount} ${orderInfo.payment.currency}</code>\n📃 OrderId: <code>#${orderInfo.payment.orderId}</code>\n#️⃣ txID: <code>${orderInfo.payment.txID}</code>\n\nDate: <code>${new Date(orderInfo.payment.date * 1000).toUTCString()}</code></b>`
+            const text = `<b>📦 ${orderInfo.product[0].name}\n🌍 Location: ${orderInfo.product[0].location}\n🛒 Qty: <code>${orderInfo.qty}</code>\n💵 Total Amount: <code>${orderInfo.payment.amount} ${orderInfo.payment.currency}</code>\n📃 OrderId: <code>#${orderInfo.payment.orderId}</code>\n#️⃣ txID: <code>${orderInfo.payment.txID}</code>\n\nDate: <code>${new Date(orderInfo.payment.date * 1000).toUTCString()}</code></b>`
             await Bot.deleteMessage(chat_id, message_id)
             return Bot.sendPhoto(chat_id, orderInfo.product[0].location_image, {
                 caption: text,
@@ -447,7 +452,7 @@ const onCallBackQuery = async (callback) => {
 
         if (command === "/replyto") {
             const user_id = array[0]
-            const text = `💬 Send reply in single message or <code>/cancel</code>`
+            const text = `💬 Send reply in single message or /cancel`
             await Bot.sendMessage(chat_id, text, {
                 parse_mode: "HTML"
             })
@@ -468,7 +473,7 @@ const onCallBackQuery = async (callback) => {
         if (command === "/admin_add") {
             const type = array[0]
             if (type == "country") {
-                const text = `Enter country name (Eg: Serbia) or seperate by commas (Eg: Serbia,Greece,other,...)\n\n<code>/cancel</code> to cancel`
+                const text = `Enter country name (Eg: Serbia) or seperate by commas (Eg: Serbia,Greece,other,...)\n\n/cancel to cancel`
                 await Bot.sendMessage(chat_id, text, {
                     parse_mode: "HTML"
                 })
@@ -519,7 +524,7 @@ const onCallBackQuery = async (callback) => {
 
         if (command === "/add_city_to") {
             const country = array[0]
-            const text = `Enter city name to add in ${country} (Eg: Serbia) or seperate by commas (Eg: Serbia,Greece,other,...)\n\n<code>/cancel</code> to cancel`
+            const text = `Enter city name to add in ${country} (Eg: Serbia) or seperate by commas (Eg: Serbia,Greece,other,...)\n\n/cancel to cancel`
             await Bot.sendMessage(chat_id, text, {
                 parse_mode: "HTML"
             })
@@ -543,7 +548,7 @@ const onCallBackQuery = async (callback) => {
             const productInfo = {}
             const cityId = array[0]
             const city = await cityDB.findOne({_id: cityId})
-            const text = `Adding product to {country: ${city.country}, city: ${city.name}}\n\nPlease enter the name of product!\n\n<code>/cancel</code> to cancel`
+            const text = `Adding product to {country: ${city.country}, city: ${city.name}}\n\nEnter your product name\n\n/cancel to cancel`
             await Bot.sendMessage(chat_id, text, {
                 parse_mode: "HTML"
             })
@@ -554,7 +559,7 @@ const onCallBackQuery = async (callback) => {
                     })
                 }
                 productInfo.name = msg.text
-                await Bot.sendMessage(chat_id, `${JSON.stringify(productInfo)}\n\nEnter the weight in digits only (in Kg)\n\n<code>/cancel</code> to cancel`, {
+                await Bot.sendMessage(chat_id, `${JSON.stringify(productInfo)}\n\nEnter price in digits (EUR) (Eg: 5)\n\n/cancel to cancel`, {
                     parse_mode: "HTML"
                 })
                 Bot.once("message", async (msg) => {
@@ -563,8 +568,8 @@ const onCallBackQuery = async (callback) => {
                             parse_mode: "HTML"
                         })
                     }
-                    productInfo.weight = parseFloat(msg.text)
-                    await Bot.sendMessage(chat_id, `${JSON.stringify(productInfo)}\n\nEnter price in digit only\n\n<code>/cancel</code> to cancel`, {
+                    productInfo.price = parseFloat(msg.text)
+                    await Bot.sendMessage(chat_id, `${JSON.stringify(productInfo)}\n\nSend product Image`, {
                         parse_mode: "HTML"
                     })
                     Bot.once("message", async (msg) => {
@@ -573,45 +578,12 @@ const onCallBackQuery = async (callback) => {
                                 parse_mode: "HTML"
                             })
                         }
-                        productInfo.price = parseFloat(msg.text)
-                        await Bot.sendMessage(chat_id, `${JSON.stringify(productInfo)}\n\nSend product photo only`, {
-                            parse_mode: "HTML"
-                        })
-                        Bot.once("message", async (msg) => {
-                            if (msg.text == "/cancel") {
-                                return Bot.sendMessage(msg.chat.id, "<i>✖️ Cancelled</i>", {
-                                    parse_mode: "HTML"
-                                })
-                            }
-                            productInfo.product_image = msg.photo[0].file_id
-                            await Bot.sendMessage(chat_id, `${JSON.stringify(productInfo)}\n\nSend location photo only`, {
-                                parse_mode: "HTML"
-                            })
-                            Bot.once("message", async (msg) => {
-                                if (msg.text == "/cancel") {
-                                    return Bot.sendMessage(msg.chat.id, "<i>✖️ Cancelled</i>", {
-                                        parse_mode: "HTML"
-                                    })
-                                }
-                                productInfo.location_image = msg.photo[0].file_id
-                                await Bot.sendMessage(chat_id, `${JSON.stringify(productInfo)}\n\nEnter location url`, {
-                                    parse_mode: "HTML"
-                                })
-                                Bot.once("message", async (msg) => {
-                                    if (msg.text == "/cancel") {
-                                        return Bot.sendMessage(msg.chat.id, "<i>✖️ Cancelled</i>", {
-                                            parse_mode: "HTML"
-                                        })
-                                    }
-                                    productInfo.location = msg.text
-                                    const findDoc = await productDB.findOne().sort({_id: -1})
-                                    await productDB.create({ _id: findDoc ? findDoc._id + 1 : 1, product_image: productInfo.product_image, location_image: productInfo.location_image, city: city.name, currency: "euro", weight: productInfo.weight, price: productInfo.price, name: productInfo.name, location: productInfo.location})
-                                    await Bot.sendMessage(chat_id, `${JSON.stringify(productInfo)}\n\n✅ Product saved`, {
-                                        parse_mode: "HTML",
-                                        disable_web_page_preview: true
-                                    })
-                                })
-                            })
+                        productInfo.product_image = msg.photo[0].file_id
+                        const findDoc = await productDB.findOne().sort({_id: -1})
+                        await productDB.create({ _id: findDoc ? findDoc._id + 1 : 1, product_image: productInfo.product_image, city: city.name, currency: "euro", price: productInfo.price, name: productInfo.name})
+                        await Bot.sendMessage(chat_id, `${JSON.stringify(productInfo)}\n\n✅ Product saved`, {
+                            parse_mode: "HTML",
+                            disable_web_page_preview: true
                         })
                     })
                 })
@@ -619,34 +591,16 @@ const onCallBackQuery = async (callback) => {
         }
 
         if (command === "/status_change") {
-            const product_id = array[0]
+            const product_id = parseInt(array[0])
             const status = array[1]
             await productDB.updateOne({ _id: product_id }, { $set: { active: status } })
-            const products = await productDB.find({})
+            const product = await productDB.findOne({_id: product_id})
             const key = [
-                [
-                    { text: "➕ Add Country", callback_data: "/admin_add country" },
-                    { text: "➕ Add City", callback_data: "/admin_add city" }
-                ], [
-                    { text: "➕ Add Product", callback_data: "/admin_add product" }
-                ], [
-                    {text: "👇 product List 👇", callback_data: "0"}
-                ]
+                [{ text: `${product.active ? `✅ Active` : `❌ Disabled`}`, callback_data: `/status_change ${product_id} ${!product.active}` }, { text: `❌ Delete`, callback_data: `/deleteProduct ${product_id}` }],
+                [{ text: "View Product Image", callback_data: `/admin_view_pimage ${product_id}`},{text: "View Drop", callback_data: `/admin_view_drop ${product_id}`}],
+                [{ text: `🖊️ Edit Name`, callback_data: `/admin_change Name ${product_id}` }, { text: `🖊️ Edit Image`, callback_data: `/admin_change Pimage ${product_id}` }, { text: `🖊️ Edit Price`, callback_data: `/admin_change Price ${product_id}` }],
+                [{ text: "🖊️ Add/Change Drop", callback_data: `/admin_change Drop ${product_id}`}]
             ]
-            if (products.length > 0) {
-                const keys = products.map(item => {
-                    const items =  [
-                        {
-                            text: `${item.weight}Kg ${item.name} - ${item.price} ${item.currency}`, callback_data: '0'
-                        },
-                        {
-                            text: `${item.active ? `✅ Active` : `❌ Disabled`}`, callback_data: `/status_change ${item._id} ${!item.active}`
-                        }
-                    ]
-                    key.push(items)
-                    return true
-                })
-            }
             return Bot.editMessageReplyMarkup({
                 inline_keyboard: key
             }, {
@@ -655,8 +609,209 @@ const onCallBackQuery = async (callback) => {
             })
         }
 
+        if(command === "/admin_list"){
+            const type = array[0]
+            if (type == "country") {
+                const text = `📃 List of available county`
+                const countries = await countryDB.find()
+                const key = countries.map(item => {
+                    return [{text: item.name, callback_data: "0"},{text: "❌ Delete", callback_data: `/admin_delete country ${item._id}`}]
+                })
+                return await Bot.editMessageText(text, {
+                    chat_id: chat_id,
+                    message_id: message_id,
+                    parse_mode: "HTML",
+                    reply_markup: {
+                        inline_keyboard: key
+                    }
+                })
+            }
+
+            if (type == "city") {
+                const text = `📃 List of available city`
+                const cities = await cityDB.find()
+                const key = cities.map(item => {
+                    return [{text: item.name, callback_data: "0"},{text: "❌ Delete", callback_data: `/admin_delete city ${item._id}`}]
+                })
+                return await Bot.editMessageText(text, {
+                    chat_id: chat_id,
+                    message_id: message_id,
+                    parse_mode: "HTML",
+                    reply_markup: {
+                        inline_keyboard: key
+                    }
+                })
+            }
+        }
+
+        if (command === "/admin_delete") {
+            const id = array[1]
+            const type = array[0]
+            if (type == "city") {
+                const text = `✅ City deleted`
+                await cityDB.deleteOne({_id: new Types.ObjectId(id)})
+                return await Bot.editMessageText(text, {
+                    chat_id: chat_id,
+                    message_id: message_id,
+                    parse_mode: "HTML"
+                })
+            }
+            if (type == "country") {
+                const text = `✅ City deleted`
+                await countryDB.deleteOne({_id: new Types.ObjectId(id)})
+                return await Bot.editMessageText(text, {
+                    chat_id: chat_id,
+                    message_id: message_id,
+                    parse_mode: "HTML"
+                })
+            }
+        }
+
+        if (command === "/admin_products") {
+            const product_id = parseInt(array[0])
+            const product = await productDB.findOne({_id: product_id})
+            const text = `<b>Title: ${product.name}\nPrice: ${product.price} ${product.currency}\n</b>`
+            const key = [
+                [{ text: `${product.active ? `✅ Active` : `❌ Disabled`}`, callback_data: `/status_change ${product_id} ${!product.active}` }, { text: `❌ Delete`, callback_data: `/deleteProduct ${product_id}` }],
+                [{ text: "View Product Image", callback_data: `/admin_view_pimage ${product_id}`},{text: "View Drop", callback_data: `/admin_view_drop ${product_id}`}],
+                [{ text: `🖊️ Edit Name`, callback_data: `/admin_change Name ${product_id}` }, { text: `🖊️ Edit Image`, callback_data: `/admin_change Pimage ${product_id}` }, { text: `🖊️ Edit Price`, callback_data: `/admin_change Price ${product_id}` }],
+                [{ text: "🖊️ Add/Change Drop", callback_data: `/admin_change Drop ${product_id}`}]
+            ]
+            return await Bot.editMessageText(text, {
+                chat_id: chat_id,
+                message_id: message_id,
+                parse_mode: "HTML",
+                reply_markup: {
+                    inline_keyboard: key
+                }
+            })
+        }
+
+        if (command === "/admin_change") {
+            const type = array[0]
+            const pid = parseInt(array[1])
+            if (type == "Name") {
+                const text = `🖊️ Enter the title of your product!\n\n/cancel to cancel`
+                await Bot.editMessageText(text, {
+                    chat_id: chat_id,
+                    message_id: message_id,
+                    parse_mode: "HTML"
+                })
+                Bot.once("message", async (msg) => {
+                    if (msg.text == "/cancel") {
+                        return await Bot.sendMessage(chat_id, "<i>✖️ Cancelled!</i>")
+                    }
+                    await productDB.updateOne({ _id: pid }, { $set: { name: msg.text } })
+                    return await Bot.sendMessage(chat_id, "✅ Name updated")
+                })
+            }
+            if (type == "Price") {
+                const text = `🖊️ Enter the price in digits (EUR) (Eg: 5)!\n\n/cancel to cancel`
+                await Bot.editMessageText(text, {
+                    chat_id: chat_id,
+                    message_id: message_id,
+                    parse_mode: "HTML"
+                })
+                Bot.once("message", async (msg) => {
+                    if (msg.text == "/cancel") {
+                        return await Bot.sendMessage(chat_id, "<i>✖️ Cancelled!</i>")
+                    }
+                    await productDB.updateOne({ _id: pid }, { $set: { price: parseFloat(msg.text) } })
+                    return await Bot.sendMessage(chat_id, "✅ Price updated")
+                })
+            }
+            if (type == "Pimage") {
+                const text = `🖊️ Send product image!\n\n/cancel to cancel`
+                await Bot.editMessageText(text, {
+                    chat_id: chat_id,
+                    message_id: message_id,
+                    parse_mode: "HTML"
+                })
+                Bot.once("message", async (msg) => {
+                    if (msg.text == "/cancel") {
+                        return await Bot.sendMessage(chat_id, "<i>✖️ Cancelled!</i>")
+                    }
+                    const img = msg.photo[0].file_id
+                    await productDB.updateOne({ _id: pid }, { $set: { product_image: img } })
+                    return await Bot.sendMessage(chat_id, "✅ Product image updated")
+                })
+            }
+            if (type == "Drop") {
+                const text = `🖊️ Send Drop image and location url in caption!\n\n/cancel to cancel`
+                await Bot.editMessageText(text, {
+                    chat_id: chat_id,
+                    message_id: message_id,
+                    parse_mode: "HTML"
+                })
+                Bot.once("message", async (msg) => {
+                    if (msg.text == "/cancel") {
+                        return await Bot.sendMessage(chat_id, "<i>✖️ Cancelled!</i>")
+                    }
+                    const img = msg.photo[0].file_id
+                    if (msg.caption) {
+                        await productDB.updateOne({ _id: pid }, { $set: { location: msg.caption } })
+                    }
+                    await productDB.updateOne({ _id: pid }, { $set: { location_image: img } })
+                    return await Bot.sendMessage(chat_id, "✅ Drop updated")
+                })
+            }
+        }
+
+        if (command === "/deleteProduct") {
+            const pid = parseInt(array[0])
+            await productDB.deleteOne({ _id: pid })
+            const text = "✅ Product deleted"
+            return await Bot.editMessageText(text, {
+                chat_id: chat_id,
+                message_id: message_id,
+                parse_mode: "HTML",
+            })
+        }
+
+        if (command === "/admin_view_pimage") {
+            const pid = parseInt(array[0])
+            const product = await productDB.findOne({ _id: pid })
+            const product_image = product.product_image
+            if (product_image) {
+                const key = [
+                    [{text: "🔙 Back", callback_data: `/admin_remove_view`}]
+                ]
+                return await Bot.sendPhoto(chat_id, product_image, {
+                    reply_markup: {
+                        inline_keyboard: key
+                    }
+                })
+            } else {
+                return await Bot.answerCallbackQuery(callback.id, "❌ No Image exist")
+            }
+        }
+
+        if (command === "/admin_remove_view") {
+            return await Bot.deleteMessage(chat_id, message_id)
+        }
+
+        if (command === "/admin_view_drop") {
+            const pid = parseInt(array[0])
+            const product = await productDB.findOne({ _id: pid })
+            const drop_image = product.location_image
+            const location = product.location
+            if (drop_image) {
+                const key = [
+                    [{text: "🔙 Back", callback_data: `/admin_remove_view`}]
+                ]
+                return await Bot.sendPhoto(chat_id, drop_image, {
+                    caption: location || "No Location url",
+                    reply_markup: {
+                        inline_keyboard: key
+                    }
+                })
+            } else {
+                return await Bot.answerCallbackQuery(callback.id, "❌ No Image exist")
+            }
+        }
+
     } catch (err) {
-       
+       console.log(err);
     }
 
 }

@@ -10,9 +10,6 @@ const product = new Schema({
     name: {
         type: String
     },
-    weight: {
-        type: Number
-    },
     currency: {
       type: String  
     },

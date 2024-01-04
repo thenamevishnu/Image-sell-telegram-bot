@@ -4,7 +4,7 @@
     "description": "",
     "main": "app.mjs",
     "scripts": {
-        "test": "node-dev app.mjs"
+        "test": "nodemon app.mjs"
     },
     "author": "",
     "license": "ISC",
@@ -15,8 +15,10 @@
         "express": "^4.18.2",
         "mongoose": "^8.0.3",
         "node-cron": "^3.0.3",
-        "node-dev": "^8.0.0",
         "node-telegram-bot-api": "^0.64.0"
     },
-    "type": "module"
+    "type": "module",
+    "devDependencies": {
+        "nodemon": "^3.0.2"
+    }
 }
