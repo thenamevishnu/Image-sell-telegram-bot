@@ -9,6 +9,7 @@ import { Types } from "mongoose"
 import { createPaymentLink } from "../Utils/oxapay.mjs"
 import { userDB } from "../Models/user.model.mjs"
 import { orderDB } from "../Models/orders.model.mjs"
+import { neighbourhoodDB } from "../Models/neighbourhood.model.mjs"
 
 env.config()
 
@@ -176,10 +177,14 @@ const adminPanel = async (msg) => {
             [
                 { text: "➕ Add Country", callback_data: "/admin_add country" },
                 { text: "➕ Add City", callback_data: "/admin_add city" }
+            ], [
+                { text: "➕ Add Neighbourhood", callback_data: "/admin_add neighbour" }  
             ],
             [
                 { text: "📃 Country List", callback_data: "/admin_list country" },
                 { text: "📃 City List", callback_data: "/admin_list city" }
+            ], [
+                { text: "📃 Neighbourhood List", callback_data: "/admin_list neighbour" }  
             ],
             [
                 { text: "➕ Add Product", callback_data: "/admin_add product" }
@@ -238,8 +243,25 @@ const onCallBackQuery = async (callback) => {
 
         if (command === "/select_city") {
             const city = array[0]
-            const text = `🏙️ ${city}\n◾◾◾◾◾\nSelect a product`
-            const products = await productDB.find({city: city})
+            const text = `🏙️ ${city}\n◾◾◾◾◾\nSelect a neighbourhood`
+            const neighbourhood = await neighbourhoodDB.find({city: city})
+            const key = neighbourhood.map(item => {
+                return [{text: `${item.name}`, callback_data: `/select_neighbour ${item.name}`}]
+            })
+            return await Bot.editMessageText(text, {
+                chat_id: chat_id,
+                message_id: message_id,
+                parse_mode: "HTML",
+                reply_markup: {
+                    inline_keyboard: key
+                }
+            })
+        }
+
+        if (command === "/select_neighbour") {
+            const neighbour = array[0]
+            const text = `🏙️ ${neighbour}\n◾◾◾◾◾\nSelect a product`
+            const products = await productDB.find({neighbourhood: neighbour})
             const key = products.map(item => {
                 return [{text: `${item.active ? `✅` : `❌`} ${item.name} 💵 ${item.price} ${item.currency}`, callback_data: `/select_product ${item._id}`}]
             })
@@ -259,7 +281,7 @@ const onCallBackQuery = async (callback) => {
             if (!product.active) {
                 return Bot.answerCallbackQuery(callback.id, "✖️ Product is not available!")
             }
-            const text = `🏙️ ${product.city}\n◾◾◾◾◾\n📦 ${product.name}\n💵 ${product.price} ${product.currency}\nℹ️ No description`
+            const text = `🏙️ ${product.neighbourhood}\n◾◾◾◾◾\n📦 ${product.name}\n💵 ${product.price} ${product.currency}\nℹ️ No description`
             const key = [[
                 {
                     text:"➕ Add to cart", callback_data: `/addtocart ${product_id} 1`
@@ -507,11 +529,25 @@ const onCallBackQuery = async (callback) => {
                 })
             }
 
-            if (type == "product") {
-                const text = `Select city to add products!`
+            if (type == "neighbour") {
+                const text = `Select city to add neighbourhood!`
                 const cities = await cityDB.find({})
                 const key = cities.map(item => {
-                    return [{text: `${item.name} (${item.country})`, callback_data: `/add_product_to ${item._id}`}]
+                    return [{text: item.name, callback_data: `/add_neighbour_to ${item.name}`}]
+                })
+                await Bot.sendMessage(chat_id, text, {
+                    parse_mode: "HTML",
+                    reply_markup: {
+                        inline_keyboard: key
+                    }
+                })
+            }
+
+            if (type == "product") {
+                const text = `Select neighbourhood to add products!`
+                const neighbour = await neighbourhoodDB.find({})
+                const key = neighbour.map(item => {
+                    return [{text: `${item.name} (${item.city})`, callback_data: `/add_product_to ${item._id}`}]
                 })
                 await Bot.sendMessage(chat_id, text, {
                     parse_mode: "HTML",
@@ -544,11 +580,33 @@ const onCallBackQuery = async (callback) => {
             })
         }
 
+        if (command === "/add_neighbour_to") {
+            const city = array[0]
+            const text = `Enter neighbour name to add in ${city} (Eg: city1) or seperate by commas (Eg: city1,city2,other,...)\n\n/cancel to cancel`
+            await Bot.sendMessage(chat_id, text, {
+                parse_mode: "HTML"
+            })
+            Bot.once("message", async (msg) => {
+                if (msg.text == "/cancel") {
+                    return Bot.sendMessage(msg.chat.id, "<i>✖️ Cancelled</i>", {
+                        parse_mode: "HTML"
+                    })
+                }
+                msg.text.split(",").forEach(async item => {
+                    await neighbourhoodDB.create({name: item, city: city})
+                })
+                const text = `✅ Neighbourhoods added`
+                return Bot.sendMessage(msg.chat.id, text, {
+                    parse_mode: "HTML"
+                })
+            })
+        }
+
         if (command === "/add_product_to") {
             const productInfo = {}
-            const cityId = array[0]
-            const city = await cityDB.findOne({_id: cityId})
-            const text = `Adding product to {country: ${city.country}, city: ${city.name}}\n\nEnter your product name\n\n/cancel to cancel`
+            const neighbourId = array[0]
+            const neighbour = await neighbourhoodDB.findOne({_id: neighbourId})
+            const text = `Adding product to {City: ${neighbour.city}}\n\nEnter your product name\n\n/cancel to cancel`
             await Bot.sendMessage(chat_id, text, {
                 parse_mode: "HTML"
             })
@@ -580,7 +638,7 @@ const onCallBackQuery = async (callback) => {
                         }
                         productInfo.product_image = msg.photo[0].file_id
                         const findDoc = await productDB.findOne().sort({_id: -1})
-                        await productDB.create({ _id: findDoc ? findDoc._id + 1 : 1, product_image: productInfo.product_image, city: city.name, currency: "euro", price: productInfo.price, name: productInfo.name})
+                        await productDB.create({ _id: findDoc ? findDoc._id + 1 : 1, product_image: productInfo.product_image, neighbourhood: neighbour.name, currency: "euro", price: productInfo.price, name: productInfo.name})
                         await Bot.sendMessage(chat_id, `${JSON.stringify(productInfo)}\n\n✅ Product saved`, {
                             parse_mode: "HTML",
                             disable_web_page_preview: true
@@ -642,6 +700,22 @@ const onCallBackQuery = async (callback) => {
                     }
                 })
             }
+
+            if (type == "neighbour") {
+                const text = `📃 List of available neighbourboods`
+                const neighbour = await neighbourhoodDB.find()
+                const key = neighbour.map(item => {
+                    return [{text: item.name, callback_data: "0"},{text: "❌ Delete", callback_data: `/admin_delete neighbour ${item._id}`}]
+                })
+                return await Bot.editMessageText(text, {
+                    chat_id: chat_id,
+                    message_id: message_id,
+                    parse_mode: "HTML",
+                    reply_markup: {
+                        inline_keyboard: key
+                    }
+                })
+            }
         }
 
         if (command === "/admin_delete") {
@@ -659,6 +733,16 @@ const onCallBackQuery = async (callback) => {
             if (type == "country") {
                 const text = `✅ City deleted`
                 await countryDB.deleteOne({_id: new Types.ObjectId(id)})
+                return await Bot.editMessageText(text, {
+                    chat_id: chat_id,
+                    message_id: message_id,
+                    parse_mode: "HTML"
+                })
+            }
+
+            if (type == "country") {
+                const text = `✅ Neighbourhood deleted`
+                await neighbourhoodDB.deleteOne({_id: new Types.ObjectId(id)})
                 return await Bot.editMessageText(text, {
                     chat_id: chat_id,
                     message_id: message_id,
