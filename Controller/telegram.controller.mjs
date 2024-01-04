@@ -43,7 +43,7 @@ const shop = async (msg) => {
     try {
         const countries = await countryDB.find({})
         const key = countries.map(item => {
-            return [{text: item.name, callback_data: `/select_country ${item.name}`}]
+            return [{text: item.name, callback_data: `/select_country | ${item.name}`}]
         })
         const text = `🌍 Select a country`
         return await Bot.sendMessage(msg.chat.id, text, {
@@ -223,13 +223,15 @@ const onCallBackQuery = async (callback) => {
         const command = query.split(" ")[0]
         const array = query.split(" ")
         array.shift()
+        const params = query.split(" | ")
+        params.shift()
 
         if (command === "/select_country") {
-            const country = array[0]
+            const country = params[0]
             const text = `🏙️ Select a city`
             const cities = await cityDB.find({country: country})
             const key = cities.map(item => {
-                return [{text: item.name, callback_data: `/select_city ${item.name}`}]
+                return [{text: item.name, callback_data: `/select_city | ${item.name}`}]
             })
             return await Bot.editMessageText(text, {
                 chat_id: chat_id,
@@ -242,11 +244,11 @@ const onCallBackQuery = async (callback) => {
         }
 
         if (command === "/select_city") {
-            const city = array[0]
+            const city = params[0]
             const text = `🏙️ ${city}\n◾◾◾◾◾\nSelect a neighbourhood`
             const neighbourhood = await neighbourhoodDB.find({city: city})
             const key = neighbourhood.map(item => {
-                return [{text: `${item.name}`, callback_data: `/select_neighbour ${item.name}`}]
+                return [{text: `${item.name}`, callback_data: `/select_neighbour | ${item.name}`}]
             })
             return await Bot.editMessageText(text, {
                 chat_id: chat_id,
@@ -259,7 +261,7 @@ const onCallBackQuery = async (callback) => {
         }
 
         if (command === "/select_neighbour") {
-            const neighbour = array[0]
+            const neighbour = params[0]
             const text = `🏙️ ${neighbour}\n◾◾◾◾◾\nSelect a product`
             const products = await productDB.find({neighbourhood: neighbour})
             const key = products.map(item => {
@@ -519,7 +521,7 @@ const onCallBackQuery = async (callback) => {
                 const text = `Select country to add cities!`
                 const countries = await countryDB.find({})
                 const key = countries.map(item => {
-                    return [{text: item.name, callback_data: `/add_city_to ${item.name}`}]
+                    return [{text: item.name, callback_data: `/add_city_to | ${item.name}`}]
                 })
                 await Bot.sendMessage(chat_id, text, {
                     parse_mode: "HTML",
@@ -533,7 +535,7 @@ const onCallBackQuery = async (callback) => {
                 const text = `Select city to add neighbourhood!`
                 const cities = await cityDB.find({})
                 const key = cities.map(item => {
-                    return [{text: item.name, callback_data: `/add_neighbour_to ${item.name}`}]
+                    return [{text: item.name, callback_data: `/add_neighbour_to | ${item.name}`}]
                 })
                 await Bot.sendMessage(chat_id, text, {
                     parse_mode: "HTML",
@@ -547,7 +549,7 @@ const onCallBackQuery = async (callback) => {
                 const text = `Select neighbourhood to add products!`
                 const neighbour = await neighbourhoodDB.find({})
                 const key = neighbour.map(item => {
-                    return [{text: `${item.name} (${item.city})`, callback_data: `/add_product_to ${item._id}`}]
+                    return [{text: `${item.name} (${item.city})`, callback_data: `/add_product_to | ${item._id}`}]
                 })
                 await Bot.sendMessage(chat_id, text, {
                     parse_mode: "HTML",
@@ -559,7 +561,7 @@ const onCallBackQuery = async (callback) => {
         }
 
         if (command === "/add_city_to") {
-            const country = array[0]
+            const country = params[0]
             const text = `Enter city name to add in ${country} (Eg: Serbia) or seperate by commas (Eg: Serbia,Greece,other,...)\n\n/cancel to cancel`
             await Bot.sendMessage(chat_id, text, {
                 parse_mode: "HTML"
@@ -581,7 +583,7 @@ const onCallBackQuery = async (callback) => {
         }
 
         if (command === "/add_neighbour_to") {
-            const city = array[0]
+            const city = params[0]
             const text = `Enter neighbour name to add in ${city} (Eg: city1) or seperate by commas (Eg: city1,city2,other,...)\n\n/cancel to cancel`
             await Bot.sendMessage(chat_id, text, {
                 parse_mode: "HTML"
@@ -604,7 +606,7 @@ const onCallBackQuery = async (callback) => {
 
         if (command === "/add_product_to") {
             const productInfo = {}
-            const neighbourId = array[0]
+            const neighbourId = params[0]
             const neighbour = await neighbourhoodDB.findOne({_id: neighbourId})
             const text = `Adding product to {City: ${neighbour.city}}\n\nEnter your product name\n\n/cancel to cancel`
             await Bot.sendMessage(chat_id, text, {
