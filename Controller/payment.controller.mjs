@@ -47,11 +47,10 @@ const paymentCallback = async (req, res) => {
                     const orderId = postData.orderId
                     const image = cart[0].product[0].location_image
                     const name = cart[0].product[0].name
-                    const weight = cart[0].product[0].weight
                     const link = cart[0].product[0].link
                     const Qty = cart[0].qty
                     await Bot.sendPhoto(postData.description, image, {
-                        caption: `✅ Order <code>#${orderId}</code>\n📦 ${weight}Kg ${name}\n🛒 Qty: ${Qty}\n${image}\n🔗 Link: ${link}`,
+                        caption: `✅ Order <code>#${orderId}</code>\n📦 ${name}\n🛒 Qty: ${Qty}\n${image}\n🔗 Link: ${link}`,
                         parse_mode: "HTML"
                     })
                     const payment = {
