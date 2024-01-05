@@ -3,8 +3,8 @@ import { cartDB } from "../Models/cart.model.mjs"
 const cartManage = async (req, res) => {
     try {
         const { product_id, qty, user_id } = req.body
-        const cart = await cartDB.find({ user_id: user_id, product_id: product_id })
-        if (cart.length==0) {
+        const cart = await cartDB.find({ user_id: user_id, product_id: product_id }) 
+        if (cart.length == 0) {
             await cartDB.create({user_id: user_id, product_id: product_id, qty: qty})
         } else {
             if (qty == 0) {

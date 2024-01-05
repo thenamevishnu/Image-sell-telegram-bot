@@ -23,12 +23,16 @@ const product = new Schema({
     product_image: {
         type: String
     },
-    location_image: {
-        type: String
-    },
-    location: {
-        type: String
-    }
+    location: [
+        {
+            photo: {
+                type: String
+            },
+            url: {
+                type: String
+            }
+        }
+    ]
 }, {
     timestamps: true
 })

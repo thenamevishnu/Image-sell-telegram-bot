@@ -7,6 +7,14 @@ const order = new Schema({
     product_id: {
         type: Number
     },
+    location: {
+        photo: {
+            type: String
+        },
+        url: {
+            type: String
+        }
+    },
     qty: {
         type: Number  
     },

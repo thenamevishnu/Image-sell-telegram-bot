@@ -4,6 +4,7 @@ import Bot from "../Telegram/Config.mjs"
 import { Types } from "mongoose"
 import { cartDB } from "../Models/cart.model.mjs"
 import { orderDB } from "../Models/orders.model.mjs"
+import { productDB } from "../Models/product.model.mjs"
 env.config()
 
 const paymentCallback = async (req, res) => {
@@ -45,14 +46,20 @@ const paymentCallback = async (req, res) => {
                         }
                     ])
                     const orderId = postData.orderId
-                    const image = cart[0].product[0].location_image
+                    const image = cart[0].product[0].location?.[0]?.photo
                     const name = cart[0].product[0].name
-                    const link = cart[0].product[0].link
+                    const location = cart[0].product[0].location?.[0]?.url
                     const Qty = cart[0].qty
-                    await Bot.sendPhoto(postData.description, image, {
-                        caption: `✅ Order <code>#${orderId}</code>\n📦 ${name}\n🛒 Qty: ${Qty}\n${image}\n🔗 Link: ${link}`,
-                        parse_mode: "HTML"
-                    })
+                    if (!image) {
+                        await Bot.sendMessage(postData.description, `<i>✖️ There is no drop available. Contact admin!</i>`, {
+                            parse_mode: "HTML"
+                        })
+                    } else {
+                        await Bot.sendPhoto(postData.description, image, {
+                            caption: `✅ Order <code>#${orderId}</code>\n📦 ${name}\n🛒 Qty: ${Qty}\n${location}`,
+                            parse_mode: "HTML"
+                        })
+                    }
                     const payment = {
                         amount: postData.amount,
                         currency: postData.currency,
@@ -64,10 +71,15 @@ const paymentCallback = async (req, res) => {
                     await orderDB.create({
                         user_id: postData.description,
                         product_id: cart[0].product_id,
+                        location: {
+                            photo: image,
+                            url: location
+                        },
                         qty: Qty,
                         payment
                     })
-                    await cartDB.deleteOne({_id: new Types.ObjectId(cartId)})
+                    await cartDB.deleteOne({ _id: new Types.ObjectId(cartId) })
+                    await productDB.updateOne({_id: cart[0].product[0]._id},{$pull: {location:{photo: image, url: location}}})
                 }
             }
         } else {

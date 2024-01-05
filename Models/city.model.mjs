@@ -1,4 +1,4 @@
-import { Schema, model } from "mongoose";
+import { Schema, Types, model } from "mongoose";
 
 const city = new Schema({
     name: {
@@ -6,6 +6,9 @@ const city = new Schema({
     },
     country: {
         type: String
+    },
+    location: {
+        type: Types.ObjectId
     }
 }, {
     timestamps: true

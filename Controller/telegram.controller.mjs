@@ -411,7 +411,7 @@ const onCallBackQuery = async (callback) => {
                     }
                 }
             ])
-            if (!cart[0].product[0].location) {
+            if (cart[0].product[0].location.length<=0) {
                 return await Bot.answerCallbackQuery(callback.id, "❌ No Drop were found in this product")
             }
             const total = cart[0].product[0].price * cart[0].qty
@@ -465,9 +465,9 @@ const onCallBackQuery = async (callback) => {
                 })
             }
             const orderInfo = order[0]
-            const text = `<b>📦 ${orderInfo.product[0].name}\n🌍 Location: ${orderInfo.product[0].location}\n🛒 Qty: <code>${orderInfo.qty}</code>\n💵 Total Amount: <code>${orderInfo.payment.amount} ${orderInfo.payment.currency}</code>\n📃 OrderId: <code>#${orderInfo.payment.orderId}</code>\n#️⃣ txID: <code>${orderInfo.payment.txID}</code>\n\nDate: <code>${new Date(orderInfo.payment.date * 1000).toUTCString()}</code></b>`
+            const text = `<b>📦 ${orderInfo.product[0].name}\n🌍 Location: ${orderInfo.location.url}\n🛒 Qty: <code>${orderInfo.qty}</code>\n💵 Total Amount: <code>${orderInfo.payment.amount} ${orderInfo.payment.currency}</code>\n📃 OrderId: <code>#${orderInfo.payment.orderId}</code>\n#️⃣ txID: <code>${orderInfo.payment.txID}</code>\n\nDate: <code>${new Date(orderInfo.payment.date * 1000).toUTCString()}</code></b>`
             await Bot.deleteMessage(chat_id, message_id)
-            return Bot.sendPhoto(chat_id, orderInfo.product[0].location_image, {
+            return Bot.sendPhoto(chat_id, orderInfo.location.photo, {
                 caption: text,
                 parse_mode: "HTML",
                 disable_web_page_preview: true
@@ -843,10 +843,31 @@ const onCallBackQuery = async (callback) => {
                     }
                     const img = msg.photo?.[0]?.file_id
                     if (msg.caption) {
-                        await productDB.updateOne({ _id: pid }, { $set: { location: msg.caption } })
+                        const obj = {
+                            photo: img,
+                            url: msg.caption
+                        }
+                        await productDB.updateOne({ _id: pid }, { $push: { location: obj } })
+                    } else {
+                        const key = [
+                            [{text: "🔄️ Try again", callback_data: `/admin_change Drop ${pid}`}]
+                        ]
+                        return await Bot.sendMessage(chat_id, "<i>Add caption to image</i>", {
+                            parse_mode: "HTML",
+                            reply_markup: {
+                                inline_keyboard: key
+                            }
+                        })
                     }
-                    await productDB.updateOne({ _id: pid }, { $set: { location_image: img } })
-                    return await Bot.sendMessage(chat_id, "✅ Drop updated")
+                    const key = [
+                        [{text: "➕ Add Drop", callback_data: `/admin_change Drop ${pid}`}]
+                    ]
+                    return await Bot.sendMessage(chat_id, "✅ Drop updated", {
+                        parse_mode: "HTML",
+                        reply_markup: {
+                            inline_keyboard: key
+                        }
+                    })
                 })
             }
         }
@@ -887,14 +908,27 @@ const onCallBackQuery = async (callback) => {
         if (command === "/admin_view_drop") {
             const pid = parseInt(array[0])
             const product = await productDB.findOne({ _id: pid })
-            const drop_image = product.location_image
-            const location = product.location
-            if (drop_image) {
-                const key = [
-                    [{text: "🔙 Back", callback_data: `/admin_remove_view`}]
-                ]
-                return await Bot.sendPhoto(chat_id, drop_image, {
-                    caption: location || "No Location url",
+            const totalPics = product.location.length
+            if (totalPics > 0) {
+                const rows = new Array(totalPics).fill(0).map((_, index) => index + 1).filter(item => item !== 1)
+                let newRows = []
+                for (let index = 1; index <= Math.ceil(rows.length/5); index++){
+                    newRows.push(rows.splice(0,5))
+                }
+                const key = newRows.map(item => {
+                    return item.map(items => {
+                        return {
+                            text: items,
+                            callback_data: `/admin_drops_view ${pid} ${items}`
+                        }
+                    })
+                })
+                const back = [{ text: "🔙 Back", callback_data: `/admin_remove_view` }]
+                const del = [{ text: "❌ Delete", callback_data: `/admin_delete_drop ${pid} 0` }]
+                key.push(back)
+                key.unshift(del)
+                return await Bot.sendPhoto(chat_id, product.location[0].photo, {
+                    caption: product.location[0].url || "No Location url",
                     reply_markup: {
                         inline_keyboard: key
                     }
@@ -902,6 +936,56 @@ const onCallBackQuery = async (callback) => {
             } else {
                 return await Bot.answerCallbackQuery(callback.id, "❌ No Image exist")
             }
+        }
+
+        if (command === "/admin_drops_view") {
+            const pid = parseInt(array[0])
+            const viewIndex = parseInt(array[1])
+            const product = await productDB.findOne({ _id: pid })
+            const totalPics = product.location.length
+            if (totalPics > 0) {
+                const rows = new Array(totalPics).fill(0).map((_, index) => index + 1).filter(item => item !== viewIndex)
+                let newRows = []
+                for (let index = 1; index <= Math.ceil(rows.length/5); index++){
+                    newRows.push(rows.splice(0,5))
+                }
+                const key = newRows.map(item => {
+                    return item.map(items => {
+                        return {
+                            text: items,
+                            callback_data: `/admin_drops_view ${pid} ${items}`
+                        }
+                    })
+                })
+                const back = [{ text: "🔙 Back", callback_data: `/admin_remove_view` }]
+                const del = [{ text: "❌ Delete", callback_data: `/admin_delete_drop ${pid} ${viewIndex - 1}` }]
+                key.push(back)
+                key.unshift(del)
+                return await Bot.editMessageMedia({
+                    media: product.location[viewIndex - 1].photo,
+                    type: "photo",
+                    caption: product.location[viewIndex - 1].url
+                }, {
+                    chat_id: chat_id,
+                    message_id: message_id,
+                    reply_markup: {
+                        inline_keyboard: key
+                    }
+                })
+            } else {
+                return await Bot.answerCallbackQuery(callback.id, "❌ No Image exist")
+            }
+        }
+
+        if (command === "/admin_delete_drop") {
+            const pid = parseInt(array[0])
+            const indexId = parseInt(array[1])
+            await productDB.updateOne({ _id: pid }, { $unset: {[`location.${indexId}`]: 1} }, {$pull: {location: null}})
+            const text = `<i>✅ Drop deleted</i>`
+            await Bot.deleteMessage(chat_id, message_id)
+            return await Bot.sendMessage(chat_id, text, {
+                parse_mode: "HTML"
+            })
         }
 
     } catch (err) {
