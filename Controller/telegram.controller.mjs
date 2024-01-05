@@ -980,7 +980,9 @@ const onCallBackQuery = async (callback) => {
         if (command === "/admin_delete_drop") {
             const pid = parseInt(array[0])
             const indexId = parseInt(array[1])
-            await productDB.updateOne({ _id: pid }, { $unset: {[`location.${indexId}`]: 1} }, {$pull: {location: null}})
+            const product = await productDB.findOne({ _id: pid })
+            const toDelete = product.location[indexId]
+            await productDB.updateOne({ _id: pid }, {$pull: {location: toDelete}})
             const text = `<i>✅ Drop deleted</i>`
             await Bot.deleteMessage(chat_id, message_id)
             return await Bot.sendMessage(chat_id, text, {
