@@ -79,7 +79,11 @@ const paymentCallback = async (req, res) => {
                         payment
                     })
                     await cartDB.deleteOne({ _id: new Types.ObjectId(cartId) })
-                    await productDB.updateOne({_id: cart[0].product[0]._id},{$pull: {location:{photo: image, url: location}}})
+                    await productDB.updateOne({ _id: cart[0].product[0]._id }, { $pull: { location: { photo: image, url: location } } })
+                    const products = await productDB.findOne({ _id: cart[0].product[0]._id })
+                    if (products.location.length <= 0) {
+                        await productDB.updateOne({ _id: cart[0].product[0]._id }, { $set: {active: false} })
+                    }
                 }
             }
         } else {

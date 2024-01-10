@@ -13,6 +13,8 @@ import { neighbourhoodDB } from "../Models/neighbourhood.model.mjs"
 
 env.config()
 
+const callbackAnswer = {}
+
 const start = async (msg) => {
     try {
         const text = `Welcome to ${process.env.BOT_NAME}\n\nPay with crypto and receive a location and photo of a pre-dropped package in your city instantly.`
@@ -226,6 +228,27 @@ const onCallBackQuery = async (callback) => {
         const params = query.split(" | ")
         params.shift()
 
+        if (!callbackAnswer[chat_id]) {
+            callbackAnswer[chat_id] = {}
+        }
+
+        if (query === "/shop") {
+            const countries = await countryDB.find({})
+            const key = countries.map(item => {
+                return [{text: item.name, callback_data: `/select_country | ${item.name}`}]
+            })
+            const text = `🌍 Select a country`
+            callbackAnswer[chat_id] = {}
+            return await Bot.editMessageText(text, {
+                chat_id: chat_id,
+                message_id: message_id,
+                parse_mode: 'HTML',
+                reply_markup: {
+                    inline_keyboard: key
+                }
+            })
+        }
+
         if (command === "/select_country") {
             const country = params[0]
             const text = `🏙️ Select a city`
@@ -233,6 +256,8 @@ const onCallBackQuery = async (callback) => {
             const key = cities.map(item => {
                 return [{text: item.name, callback_data: `/select_city | ${item.name}`}]
             })
+            key.push([{ text: "🔙 Back", callback_data: "/shop" }])
+            callbackAnswer[chat_id].country = country
             return await Bot.editMessageText(text, {
                 chat_id: chat_id,
                 message_id: message_id,
@@ -250,6 +275,10 @@ const onCallBackQuery = async (callback) => {
             const key = neighbourhood.map(item => {
                 return [{text: `${item.name}`, callback_data: `/select_neighbour | ${item.name}`}]
             })
+            const country = callbackAnswer[chat_id].country
+            key.push([{ text: "🔙 Back", callback_data: `/select_country | ${country}` }])
+            callbackAnswer[chat_id].city = city
+            console.log(callbackAnswer[chat_id]);
             return await Bot.editMessageText(text, {
                 chat_id: chat_id,
                 message_id: message_id,
@@ -267,6 +296,9 @@ const onCallBackQuery = async (callback) => {
             const key = products.map(item => {
                 return [{text: `${item.active ? `✅` : `❌`} ${item.name} 💵 ${item.price} ${item.currency}`, callback_data: `/select_product ${item._id}`}]
             })
+            const city = callbackAnswer[chat_id].city
+            key.push([{ text: "🔙 Back", callback_data: `/select_city | ${city}` }])
+            callbackAnswer[chat_id].neighbour = neighbour
             return await Bot.editMessageText(text, {
                 chat_id: chat_id,
                 message_id: message_id,
@@ -848,6 +880,7 @@ const onCallBackQuery = async (callback) => {
                             url: msg.caption
                         }
                         await productDB.updateOne({ _id: pid }, { $push: { location: obj } })
+                        await productDB.updateOne({ _id: pid }, { $set: { active: true } })
                     } else {
                         const key = [
                             [{text: "🔄️ Try again", callback_data: `/admin_change Drop ${pid}`}]
@@ -982,6 +1015,9 @@ const onCallBackQuery = async (callback) => {
             const indexId = parseInt(array[1])
             const product = await productDB.findOne({ _id: pid })
             const toDelete = product.location[indexId]
+            if (product.location.length <= 1) {
+                await productDB.updateOne({ _id: pid }, {active: false})
+            }
             await productDB.updateOne({ _id: pid }, {$pull: {location: toDelete}})
             const text = `<i>✅ Drop deleted</i>`
             await Bot.deleteMessage(chat_id, message_id)
