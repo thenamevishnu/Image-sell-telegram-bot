@@ -10,10 +10,12 @@ import { createPaymentLink } from "../Utils/oxapay.mjs"
 import { userDB } from "../Models/user.model.mjs"
 import { orderDB } from "../Models/orders.model.mjs"
 import { neighbourhoodDB } from "../Models/neighbourhood.model.mjs"
+import cronJob from "node-cron"
 
 env.config()
 
 const callbackAnswer = {}
+let bcast_sent = {}
 
 const start = async (msg) => {
     try {
@@ -176,6 +178,9 @@ const adminPanel = async (msg) => {
         }
         const products = await productDB.find({})
         const key = [
+            [
+                {text: "🛰️ Broadcast to users", callback_data: "/broadcast"}
+            ],
             [
                 { text: "➕ Add Country", callback_data: "/admin_add country" },
                 { text: "➕ Add City", callback_data: "/admin_add city" }
@@ -1026,10 +1031,110 @@ const onCallBackQuery = async (callback) => {
             })
         }
 
+        if (query === "/broadcast") {
+            if (chat_id == process.env.ADMIN_ID) {
+                callbackAnswer[chat_id].wait = "broadcast"
+                const button = [
+                    ["✖️ Cancel"]
+                ]
+                return await Bot.sendMessage(chat_id, "<i>🚀 Enter the message to broadcast</i>", {
+                    parse_mode: "HTML",
+                    reply_markup: {
+                        keyboard: button,
+                        resize_keyboard: true
+                    }
+                })
+            }
+        }
+
+        if (query === "/cancel_broadcast") {
+            const key = [
+                ["⭐ Shop", "📃 Orders"],
+                ["💬 Support", "🛒 Cart"]
+            ]
+            if (process.env.ADMIN_ID == chat_id) {
+                key.push(["⚙️ Admin Settings"])
+            }
+            Bot.deleteMessage(chat_id, message_id)
+            return await Bot.sendMessage(chat_id, "✖️ Broadcasting cancelled", {
+                parse_mode: "HTML",
+                reply_markup: {
+                    keyboard: key,
+                    resize_keyboard: true
+                }
+            })
+        }
+
+        if (command === "/send_broadcast") {
+            const id = parseInt(array[0])
+            const users = await userDB.find({})
+            bcast_sent[chat_id] = 0
+            const totalUsers = users.length
+            const key = [
+                ["⭐ Shop", "📃 Orders"],
+                ["💬 Support", "🛒 Cart"]
+            ]
+            if (process.env.ADMIN_ID == chat_id) {
+                key.push(["⚙️ Admin Settings"])
+            }
+            Bot.deleteMessage(chat_id, message_id)
+            await Bot.sendMessage(chat_id, "✅ Sending message to " + totalUsers + " users", {
+                parse_mode: "HTML",
+                reply_markup: {
+                    keyboard: key,
+                    resize_keyboard: true
+                }
+            })
+            const cronTask = cronJob.schedule("* * * * * *", async () => {
+                users.splice(0, 1).forEach(async item => {
+                    bcast_sent[chat_id] = bcast_sent[chat_id] + 1
+                    const user_id = item._id
+                    try {
+                        await Bot.copyMessage(user_id, chat_id, id)
+                    } catch (err) { }
+                    
+                    if (bcast_sent[chat_id] >= totalUsers) {
+                        await Bot.sendMessage(chat_id, "✅ Broadcast completed")
+                        cronTask.stop()
+                    }
+                })
+            })
+        }
+
     } catch (err) {
        console.log(err);
     }
 
+}
+
+const onMessage = async (msg) => {
+    try {
+        const chat_id = msg.chat.id
+        const waitfor = callbackAnswer?.[chat_id]?.wait
+
+        if (waitfor === "broadcast") {
+            callbackAnswer[chat_id].wait = null
+            if (msg?.text == "✖️ Cancel") {
+                return await start(msg)
+            }
+            const msg_id = msg.message_id
+            const text = `<i>🚀 Are you sure to send?</i>`
+            const key = [
+                [{text: "✅ Send", callback_data: `/send_broadcast ${msg_id}`},{text: "❌ Cancel", callback_data: "/cancel_broadcast"}]
+            ]
+            await Bot.copyMessage(chat_id, chat_id, msg_id)
+            await Bot.sendMessage(chat_id, "👆 Preview")
+            await Bot.sendMessage(chat_id, text, {
+                parse_mode: "HTML",
+                reply_markup: {
+                    inline_keyboard: key
+                }
+            })
+        }
+
+    } catch (err) {
+        
+    }
 }
 
 export default {
@@ -1039,5 +1144,6 @@ export default {
     orders,
     support,
     adminPanel,
-    onCallBackQuery
+    onCallBackQuery,
+    onMessage
 }

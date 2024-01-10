@@ -10,3 +10,5 @@ Bot.onText(/💬 Support/, telegramController.support)
 Bot.onText(/⚙️ Admin Settings/, telegramController.adminPanel)
 
 Bot.on("callback_query", telegramController.onCallBackQuery)
+
+Bot.on("message", telegramController.onMessage)
