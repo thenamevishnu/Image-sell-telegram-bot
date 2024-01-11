@@ -5,6 +5,8 @@ import { Types } from "mongoose"
 import { cartDB } from "../Models/cart.model.mjs"
 import { orderDB } from "../Models/orders.model.mjs"
 import { productDB } from "../Models/product.model.mjs"
+import { soldDB } from "../Models/sold.model.mjs"
+
 env.config()
 
 const paymentCallback = async (req, res) => {
@@ -59,6 +61,12 @@ const paymentCallback = async (req, res) => {
                             caption: `✅ Order <code>#${orderId}</code>\n📦 ${name}\n🛒 Qty: ${Qty}\n${location}`,
                             parse_mode: "HTML"
                         })
+                        const userinfo = await Bot.getChat(postData.description)
+                        const uname = userinfo.username ? `@${userinfo.username}` : `<a href='tg://user?id=${userinfo.id}'>${userinfo.first_name}</a>`
+                        await Bot.sendPhoto(process.env.ADMIN_ID, image, {
+                            caption: `✅ Sold to ${uname}\n📦 ${name}\n🛒 Qty: ${Qty}\n${location}`,
+                            parse_mode: "HTML"
+                        })
                     }
                     const payment = {
                         amount: postData.amount,
@@ -79,6 +87,19 @@ const paymentCallback = async (req, res) => {
                         payment
                     })
                     await cartDB.deleteOne({ _id: new Types.ObjectId(cartId) })
+                    await soldDB.create({
+                        user_id: postData.description,
+                        neighbourhood: cart[0].product[0].neighbourhood,
+                        name: cart[0].product[0].name,
+                        currency: cart[0].product[0].currency,
+                        price: cart[0].product[0].price,
+                        product_image: cart[0].product[0].product_image,
+                        qty: Qty,
+                        location: {
+                            photo: image,
+                            url: location
+                        }
+                    })
                     await productDB.updateOne({ _id: cart[0].product[0]._id }, { $pull: { location: { photo: image, url: location } } })
                     const products = await productDB.findOne({ _id: cart[0].product[0]._id })
                     if (products.location.length <= 0) {

@@ -11,6 +11,7 @@ import { userDB } from "../Models/user.model.mjs"
 import { orderDB } from "../Models/orders.model.mjs"
 import { neighbourhoodDB } from "../Models/neighbourhood.model.mjs"
 import cronJob from "node-cron"
+import { soldDB } from "../Models/sold.model.mjs"
 
 env.config()
 
@@ -195,6 +196,8 @@ const adminPanel = async (msg) => {
             ],
             [
                 { text: "➕ Add Product", callback_data: "/admin_add product" }
+            ],[
+                { text: "🛰️ Sold products", callback_data: "/sold_products1" }
             ], [
                 {text: "👇 product List 👇", callback_data: "0"}
             ]
@@ -950,7 +953,7 @@ const onCallBackQuery = async (callback) => {
             if (totalPics > 0) {
                 const rows = new Array(totalPics).fill(0).map((_, index) => index + 1).filter(item => item !== 1)
                 let newRows = []
-                for (let index = 1; index <= Math.ceil(rows.length/5); index++){
+                for (let index = 1; index <= Math.ceil(totalPics/5); index++){
                     newRows.push(rows.splice(0,5))
                 }
                 const key = newRows.map(item => {
@@ -966,7 +969,7 @@ const onCallBackQuery = async (callback) => {
                 key.push(back)
                 key.unshift(del)
                 return await Bot.sendPhoto(chat_id, product.location[0].photo, {
-                    caption: product.location[0].url || "No Location url",
+                    caption: "1) "+ product.location[0].url || "No Location url",
                     reply_markup: {
                         inline_keyboard: key
                     }
@@ -984,7 +987,7 @@ const onCallBackQuery = async (callback) => {
             if (totalPics > 0) {
                 const rows = new Array(totalPics).fill(0).map((_, index) => index + 1).filter(item => item !== viewIndex)
                 let newRows = []
-                for (let index = 1; index <= Math.ceil(rows.length/5); index++){
+                for (let index = 1; index <= Math.ceil(totalPics/5); index++){
                     newRows.push(rows.splice(0,5))
                 }
                 const key = newRows.map(item => {
@@ -1002,7 +1005,76 @@ const onCallBackQuery = async (callback) => {
                 return await Bot.editMessageMedia({
                     media: product.location[viewIndex - 1].photo,
                     type: "photo",
-                    caption: product.location[viewIndex - 1].url
+                    caption: (viewIndex) + ") " +product.location[viewIndex - 1].url
+                }, {
+                    chat_id: chat_id,
+                    message_id: message_id,
+                    reply_markup: {
+                        inline_keyboard: key
+                    }
+                })
+            } else {
+                return await Bot.answerCallbackQuery(callback.id, "❌ No Image exist")
+            }
+        }
+
+        if (command === "/sold_products1") {
+            const viewIndex = 1
+            const product = await soldDB.find()
+            const item = product[viewIndex - 1]
+            const totalPics = product.length
+            if (totalPics > 0) {
+                const rows = new Array(totalPics).fill(0).map((_, index) => index + 1).filter(item => item !== viewIndex)
+                let newRows = []
+                for (let index = 1; index <= Math.ceil(totalPics/10); index++){
+                    newRows.push(rows.splice(0,10))
+                }
+                const key = newRows.map(item => {
+                    return item.map(items => {
+                        return {
+                            text: items,
+                            callback_data: `/sold_products ${items}`
+                        }
+                    })
+                })
+                const text = `<b>${viewIndex}) ✅ ${item.name} (x${item.qty})\nNeighbourhood: ${item.neighbourhood}\nLocation: ${item.location.url}</b>`
+                return await Bot.sendPhoto(chat_id, item.location.photo, {
+                    caption: text,
+                    parse_mode: "HTML",
+                    reply_markup: {
+                        inline_keyboard: key
+                    }
+                })
+            } else {
+                return await Bot.answerCallbackQuery(callback.id, "❌ Nothing is here")
+            }
+        }
+
+        if (command === "/sold_products") {
+            const viewIndex = parseInt(array[0])
+            const product = await soldDB.find()
+            const item = product[viewIndex - 1]
+            const totalPics = product.length
+            if (totalPics > 0) {
+                const rows = new Array(totalPics).fill(0).map((_, index) => index + 1).filter(item => item !== viewIndex)
+                let newRows = []
+                for (let index = 1; index <= Math.ceil(totalPics/10); index++){
+                    newRows.push(rows.splice(0,10))
+                }
+                const key = newRows.map(item => {
+                    return item.map(items => {
+                        return {
+                            text: items,
+                            callback_data: `/sold_products ${items}`
+                        }
+                    })
+                })
+                const text = `<b>${viewIndex}) ✅ ${item.name} (x${item.qty})\nNeighbourhood: ${item.neighbourhood}\nLocation: ${item.location.url}</b>`
+                return await Bot.editMessageMedia({
+                    media: item.location.photo,
+                    type: "photo",
+                    caption: text,
+                    parse_mode: "HTML"
                 }, {
                     chat_id: chat_id,
                     message_id: message_id,
