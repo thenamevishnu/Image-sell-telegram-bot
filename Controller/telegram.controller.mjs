@@ -184,21 +184,19 @@ const adminPanel = async (msg) => {
             ],
             [
                 { text: "➕ Add Country", callback_data: "/admin_add country" },
+                { text: "➕ Add Product", callback_data: "/admin_add product" },
                 { text: "➕ Add City", callback_data: "/admin_add city" }
             ], [
                 { text: "➕ Add Neighbourhood", callback_data: "/admin_add neighbour" }  
-            ],
-            [
-                { text: "📃 Country List", callback_data: "/admin_list country" },
-                { text: "📃 City List", callback_data: "/admin_list city" }
             ], [
                 { text: "📃 Neighbourhood List", callback_data: "/admin_list neighbour" }  
             ],
             [
-                { text: "➕ Add Product", callback_data: "/admin_add product" }
-            ],[
-                { text: "🛰️ Sold products", callback_data: "/sold_products1" }
-            ], [
+                { text: "📃 Country List", callback_data: "/admin_list country" },
+                { text: "🛰️ Sold products", callback_data: "/sold_products1" },
+                { text: "📃 City List", callback_data: "/admin_list city" }
+            ],
+            [
                 {text: "👇 product List 👇", callback_data: "0"}
             ]
         ]
