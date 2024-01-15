@@ -286,6 +286,9 @@ const onCallBackQuery = async (callback) => {
                 const userMention = item.username ? `@${item.username}` : `<a href='tg://user?id=${item._id}'>${item.first_name}</a>`
                 text += `<b>\n${index+1}) ${userMention}</b>`
             })
+            if (users.length == 0) {
+                text += "\nNo Referrals yet!"
+            }
             return await Bot.sendMessage(chat_id, text, {
                 parse_mode: "HTML"
             })
