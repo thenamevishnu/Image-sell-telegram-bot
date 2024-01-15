@@ -98,10 +98,16 @@ const affiliateLink = async (msg) => {
     try {
         const user = await userDB.findOne({ _id: msg.chat.id })
         const refLink = `https://t.me/${process.env.BOT_NAME}?start=${msg.chat.id}`
+        const key = [
+            [{text: "📃 My Referral List", callback_data: "/referral_list"}]
+        ]
         const text = `<b>🛰️ You've invited: <code>${user.invites} Members</code>\n\n🔗 Affiliate Link: ${refLink}</b>`
         return await Bot.sendMessage(msg.chat.id, text, {
             parse_mode: 'HTML',
-            disable_web_page_preview: true
+            disable_web_page_preview: true,
+            reply_markup: {
+                inline_keyboard: key
+            }
         })
     } catch (err) {
         console.log(err.message);
@@ -271,6 +277,18 @@ const onCallBackQuery = async (callback) => {
 
         if (!answerStore[chat_id]) {
             answerStore[chat_id] = {}
+        }
+
+        if (query === "/referral_list") {
+            const users = await userDB.find({ _id: { $ne: chat_id }, inviter: chat_id })
+            let text = `<b>📃 List</b>\n`
+            users.forEach((item, index) => {
+                const userMention = item.username ? `@${item.username}` : `<a href='tg://user?id=${item._id}'>${item.first_name}</a>`
+                text += `<b>\n${index+1}) ${userMention}</b>`
+            })
+            return await Bot.sendMessage(chat_id, text, {
+                parse_mode: "HTML"
+            })
         }
 
         if (query === "/payoutHistory") {
