@@ -6,25 +6,42 @@ import { productDB } from "../Models/product.model.mjs"
 import axios from "axios"
 import { cartDB } from "../Models/cart.model.mjs"
 import { Types } from "mongoose"
-import { createPaymentLink } from "../Utils/oxapay.mjs"
+import { createPaymentLink, createPayout } from "../Utils/oxapay.mjs"
 import { userDB } from "../Models/user.model.mjs"
 import { orderDB } from "../Models/orders.model.mjs"
 import { neighbourhoodDB } from "../Models/neighbourhood.model.mjs"
 import cronJob from "node-cron"
 import { soldDB } from "../Models/sold.model.mjs"
 import { answerCallback, answerStore, getMainKey, getMainText } from "../Utils/Tg.mjs"
+import { botConfig } from "../botConfig.mjs"
+import { payoutDB } from "../Models/payout.model.mjs"
 
 env.config()
 
 let bcast_sent = {}
 
-const start = async (msg) => {
+const start = async (msg, match) => {
+    if(msg.chat.type != "private") return
     try {
         const text = getMainText()
         const key = getMainKey(msg.chat.id)
+        let inviter = match[1] || 0
         const user = await userDB.findOne({ _id: msg.chat.id })
         if (!user) {
-            await userDB.create({_id: msg.chat.id, first_name: msg.chat.first_name, username: msg.chat.username})
+            const checkInviter = await userDB.findOne({ _id: inviter })
+            if (!checkInviter) {
+                inviter = 0
+            }
+            await userDB.create({ _id: msg.chat.id, first_name: msg.chat.first_name, username: msg.chat.username, inviter: inviter })
+            const userMention = msg.chat.username ? `@${msg.chat.username}` : `<a href='tg://user?id=${msg.chat.id}'>${msg.chat.first_name}</a>`
+            let inviteUserMention = "--"
+            if (checkInviter) {
+                await userDB.updateOne({_id: inviter},{$inc:{invites: 1}})
+                inviteUserMention = checkInviter.username ? `@${checkInviter.username}` : `<a href='tg://user?id=${checkInviter._id}'>${checkInviter.first_name}</a>`
+            }
+            await Bot.sendMessage(process.env.ADMIN_ID, `<b>👤 New User\n🛰️ UserName: ${userMention}\n🫳 InvitedBy: ${inviteUserMention}</b>`, {
+                parse_mode: "HTML"
+            })
         }
         return await Bot.sendMessage(msg.chat.id, text, {
             parse_mode: "HTML",
@@ -34,11 +51,12 @@ const start = async (msg) => {
             }
         })
     } catch(err) {
-       
+        console.log(err.message);
     }
 }
 
 const shop = async (msg) => {
+    if(msg.chat.type != "private") return
     try {
         const countries = await countryDB.find({})
         const key = countries.map(item => {
@@ -52,11 +70,46 @@ const shop = async (msg) => {
             }
         })
     } catch (err) {
-       
+        console.log(err.message);
+    }
+}
+
+const accountBalance = async (msg) => {
+    if(msg.chat.type != "private") return
+    try {
+        const user = await userDB.findOne({ _id: msg.chat.id })
+        const key = [
+            [{text: "📤 Get Paid", callback_data: "/getPaid"},{text: "📃 Payout History", callback_data: "/payoutHistory"}]
+        ]
+        const text = `<b>💰 Available Balance: <code>${user.balance.toFixed(6)} BTC</code></b>`
+        return await Bot.sendMessage(msg.chat.id, text, {
+            parse_mode: 'HTML',
+            reply_markup: {
+                inline_keyboard: key
+            }
+        })
+    } catch (err) {
+        console.log(err.message);
+    }
+}
+
+const affiliateLink = async (msg) => {
+    if(msg.chat.type != "private") return
+    try {
+        const user = await userDB.findOne({ _id: msg.chat.id })
+        const refLink = `https://t.me/${process.env.BOT_NAME}?start=${msg.chat.id}`
+        const text = `<b>🛰️ You've invited: <code>${user.invites} Members</code>\n\n🔗 Affiliate Link: ${refLink}</b>`
+        return await Bot.sendMessage(msg.chat.id, text, {
+            parse_mode: 'HTML',
+            disable_web_page_preview: true
+        })
+    } catch (err) {
+        console.log(err.message);
     }
 }
 
 const cart = async (msg) => {
+    if(msg.chat.type != "private") return
     try {
         const chat_id = msg.chat.id
         const cart = await cartDB.aggregate([
@@ -90,11 +143,12 @@ const cart = async (msg) => {
             }
         })
     } catch (err) {
-       console.log(err);
+       console.log(err.message);
     }
 }
 
 const orders = async (msg) => {
+    if(msg.chat.type != "private") return
     try {
         const orders = await orderDB.aggregate([
             {
@@ -127,11 +181,12 @@ const orders = async (msg) => {
             }
         })
     } catch (err) {
-        
+        console.log(err.message);
     }
 }
 
 const support = async (msg) => {
+    if(msg.chat.type != "private") return
     try {
         const text = "<code>💬 Feel free to share your question in a single message.</code>"
         answerCallback[msg.chat.id] = "support_message"
@@ -146,11 +201,12 @@ const support = async (msg) => {
             }
         })
     } catch (err) {
-        
+        console.log(err.message);
     }
 }
 
 const adminPanel = async (msg) => {
+    if(msg.chat.type != "private") return
     try {
         const chat_id = msg.chat.id
         if (process.env.ADMIN_ID != chat_id) {
@@ -198,7 +254,7 @@ const adminPanel = async (msg) => {
             }
         })
     } catch (err) {
-        console.log(err);
+        console.log(err.message);
     }
 }
 
@@ -215,6 +271,43 @@ const onCallBackQuery = async (callback) => {
 
         if (!answerStore[chat_id]) {
             answerStore[chat_id] = {}
+        }
+
+        if (query === "/payoutHistory") {
+            const payouts = await payoutDB.find({ user_id: chat_id }).sort({ createdAt: -1 }).limit(5)
+            let text = `<b>📃 Last 5 payout list</b>`
+            if (payouts.length == 0) {
+                text+= "\n\nNo payout history yet!"
+            }
+            payouts.forEach((item, index) => {
+                text += `\n\n<code>${index+1}) </code><b>💰 ${item.amount} ${item.currency}\n🛰️ TxID: <code>${item.txID}</code></b>`
+            })
+            return await Bot.editMessageText(text, {
+                chat_id: chat_id,
+                message_id: message_id,
+                parse_mode: "HTML"
+            })
+        }
+
+        if (query === "/getPaid") {
+            const user = await userDB.findOne({ _id: chat_id })
+            if (user.balance < botConfig.PAYOUT.MINIMUM) {
+                return await Bot.answerCallbackQuery(callback.id, {
+                    text: `❌ Minimum payout is ${botConfig.PAYOUT.MINIMUM.toFixed(6)} BTC`,
+                    show_alert: true
+                })
+            }
+            answerCallback[chat_id] = "payout"
+            const text = `<i>📤 Enter the amount to withdraw</i>`
+            return await Bot.sendMessage(chat_id, text, {
+                parse_mode: "HTML",
+                reply_markup: {
+                    keyboard : [
+                        ["❌ Cancel"]
+                    ],
+                    resize_keyboard: true
+                }
+            })
         }
 
         if (query === "/shop") {
@@ -1060,12 +1153,13 @@ const onCallBackQuery = async (callback) => {
         }
 
     } catch (err) {
-       console.log(err);
+       console.log(err.message);
     }
 
 }
 
 const onMessage = async (msg) => {
+    if(msg.chat.type != "private") return
     try {
         const chat_id = msg.chat.id
         const waitfor = answerCallback[chat_id]
@@ -1079,6 +1173,57 @@ const onMessage = async (msg) => {
             answerCallback[chat_id] = null
             const key = getMainKey(chat_id)
             return await Bot.sendMessage(chat_id, `<i>✖️ Cancelled</i>`, {
+                parse_mode: "HTML",
+                reply_markup: {
+                    keyboard: key,
+                    resize_keyboard: true
+                }
+            })
+        }
+
+        if (waitfor === "payout") {
+            if (!msg.text || isNaN(msg.text)) {
+                const text = `<i>✖️ Enter BTC in numeric value</i>`
+                return Bot.sendMessage(chat_id, text, {
+                    parse_mode: "HTML"
+                })
+            }
+            const amount = parseFloat(msg.text)
+            const user = await userDB.findOne({_id: chat_id})
+            if (amount < botConfig.PAYOUT.MINIMUM || amount > user.balance) {
+                const text = `<i>✖️ Minimum ${botConfig.PAYOUT.MINIMUM.toFixed(6)} BTC & Maximum ${user.balance.toFixed(6)} BTC</i>`
+                return Bot.sendMessage(chat_id, text, {
+                    parse_mode: "HTML"
+                })
+            }
+            answerCallback[chat_id] = "payout_wallet"
+            answerStore[chat_id].amount = amount
+            const text = `<i>📧 Enter BTC ( Bitcoin network ) address for payout</i>`
+            return Bot.sendMessage(chat_id, text, {
+                parse_mode: "HTML"
+            })
+        }
+
+        if (waitfor === "payout_wallet") {
+            if (!msg.text) {
+                const text = `<i>✖️ Enter valid BTC address</i>`
+                return Bot.sendMessage(chat_id, text, {
+                    parse_mode: "HTML"
+                })
+            }
+            const address = msg.text
+            const amount = answerStore[chat_id].amount
+            answerCallback[chat_id] = null
+            await Bot.sendMessage(chat_id, `<i>⌛ Creating payout...</i>`, {
+                parse_mode: "HTML"
+            })
+            const { status: payStatus } = await createPayout(chat_id, address, amount, `${process.env.SERVER}/payout/callback`)
+            if (payStatus) {
+                await userDB.updateOne({ _id: chat_id }, { $inc: { balance: -(amount) } })
+            }
+            const text = `✅ Payout Requested\n\n💰 ${amount} BTC to ${address}\n\n🛰️ Status: ${payStatus || "Failed"}`
+            const key = getMainKey(chat_id)
+            return await Bot.sendMessage(chat_id, text, {
                 parse_mode: "HTML",
                 reply_markup: {
                     keyboard: key,
@@ -1358,13 +1503,15 @@ const onMessage = async (msg) => {
         }
 
     } catch (err) {
-        
+        console.log(err.message);
     }
 }
 
 export default {
     start,
     shop,
+    accountBalance,
+    affiliateLink,
     cart,
     orders,
     support,

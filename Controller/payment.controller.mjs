@@ -6,6 +6,8 @@ import { cartDB } from "../Models/cart.model.mjs"
 import { orderDB } from "../Models/orders.model.mjs"
 import { productDB } from "../Models/product.model.mjs"
 import { soldDB } from "../Models/sold.model.mjs"
+import { payoutDB } from "../Models/payout.model.mjs"
+import { userDB } from "../Models/user.model.mjs"
 
 env.config()
 
@@ -19,6 +21,7 @@ const paymentCallback = async (req, res) => {
         if (calculatedHmac === hmacHeader) {
             if (postData.type === "payment") {
                 const status = postData.status
+                const ordersList = await orderDB.findOne({"payment.trackId": parseInt(postData.trackId)})
                 if (status === "Waiting") {
                     return await Bot.sendMessage(postData.description, `🕛 (<code>#${postData.orderId}</code>) Waiting for payment...`, {
                         parse_mode: "HTML"
@@ -29,7 +32,7 @@ const paymentCallback = async (req, res) => {
                         parse_mode: "HTML"
                     })
                 }
-                if (status === "Paid") {
+                if (status === "Paid" && !ordersList) {
                     await Bot.sendMessage(postData.description, `✅ (<code>#${postData.orderId}</code>) Payment is confirmed`, {
                         parse_mode: "HTML"
                     })
@@ -62,6 +65,13 @@ const paymentCallback = async (req, res) => {
                             parse_mode: "HTML"
                         })
                         const userinfo = await Bot.getChat(postData.description)
+                        const inviter = await userDB.findOne({ _id: userinfo.id })
+                        const InvitedBy = inviter.inviter
+                        if (InvitedBy && InvitedBy != 0) {
+                            const commission = parseFloat(postData.amount) * 0.1
+                            await userDB.updateOne({ _id: InvitedBy }, { $inc: { balance: commission } })
+                            await Bot.sendMessage(InvitedBy, `<i>💷 Referral Income: +${commission} ${postData.currency}</i>`)
+                        }
                         const uname = userinfo.username ? `@${userinfo.username}` : `<a href='tg://user?id=${userinfo.id}'>${userinfo.first_name}</a>`
                         await Bot.sendPhoto(process.env.ADMIN_ID, image, {
                             caption: `✅ Sold to ${uname}\n📦 ${name}\n🛒 Qty: ${Qty}\n${location}`,
@@ -115,6 +125,55 @@ const paymentCallback = async (req, res) => {
     }
 }
 
+const payoutCallback = async (req, res) => {
+    try {
+        const postData = req.body
+        const apiSecretKey = process.env.OXAPAY_PAYOUT
+        const hmacHeader = req.headers['hmac']
+        const calculatedHmac = crypto.createHmac("sha512", apiSecretKey).update(JSON.stringify(postData)).digest("hex")
+        if (calculatedHmac === hmacHeader) {
+            if (postData.type === "payout") {
+                const status = postData.status
+                const paid = await payoutDB.findOne({trackId: parseInt(postData.trackId)})
+                if (status === "Confirming") {
+                    return await Bot.sendMessage(postData.description, `🕛 Your payout request sent and awaiting blockchain network confirmation.`, {
+                        parse_mode: "HTML"
+                    })
+                }
+                if (status === "Complete" && !paid) {
+                    await Bot.sendMessage(postData.description, `✅ Payout sent\n\n💰 ${postData.amount} ${postData.currency} sent to ${postData.address}\n\n🛰️ TxID: ${postData.txID}`, {
+                        parse_mode: "HTML"
+                    })
+                    
+                    const payment = {
+                        user_id: parseInt(postData.description),
+                        amount: postData.amount,
+                        currency: postData.currency,
+                        address: postData.address,
+                        date: postData.date,
+                        trackId: postData.trackId,
+                        txID: postData.txID
+                    }
+                    
+                    await payoutDB.create(payment)
+
+                    const userinfo = await Bot.getChat(postData.description)
+                    const uname = userinfo.username ? `@${userinfo.username}` : `<a href='tg://user?id=${userinfo.id}'>${userinfo.first_name}</a>`
+
+                    await Bot.sendMessage(postData.description, `✅ Payout sent to ${uname}\n\n💰 ${postData.amount} ${postData.currency} sent to ${postData.address}\n\n🛰️ TxID: ${postData.txID}`, {
+                        parse_mode: "HTML"
+                    })
+                }
+            }
+        } else {
+            res.status(400).send({ message: "Invalid HMAC signature" })
+        }
+    } catch (err) {
+        res.status(500).send({message: "internal server error"})
+    }
+}
+
 export default {
-    paymentCallback
+    paymentCallback,
+    payoutCallback
 }

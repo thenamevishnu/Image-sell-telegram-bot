@@ -4,7 +4,8 @@ env.config()
 
 export const getMainKey = (chat_id) => {
     const key = [
-        ["⭐ Shop", "📃 Orders"],
+        ["💷 Account Balance"],
+        ["⭐ Shop", "🫳 Affiliate Link", "📃 Orders"],
         ["💬 Support", "🛒 Cart"]
     ]
     if (process.env.ADMIN_ID == chat_id) {

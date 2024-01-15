@@ -18,3 +18,19 @@ export const createPaymentLink = async (user_id, amount, callbackUrl, orderId) =
     const { data: response } = await axios.post(process.env.OXAPAY_REQUEST_API, data)
     return response
 }
+
+export const createPayout = async (user_id, receiver_crypto_address, amount, callbackUrl) => {
+        
+    const body = {
+        key: process.env.OXAPAY_PAYOUT,
+        address: receiver_crypto_address,
+        amount: amount,
+        currency: "BTC",
+        callbackUrl: callbackUrl,
+        description: user_id
+    }
+
+    const { data: response } = await axios.post(process.env.OXAPAY_PAYOUT_API, body)
+
+    return response
+}
