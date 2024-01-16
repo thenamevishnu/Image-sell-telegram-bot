@@ -1,5 +1,5 @@
 export const botConfig = {
     PAYOUT: {
-        MINIMUM: 10
+        MINIMUM: 0.001
     }
 }
