@@ -25,7 +25,7 @@ export const createPayout = async (user_id, receiver_crypto_address, amount, cal
         key: process.env.OXAPAY_PAYOUT,
         address: receiver_crypto_address,
         amount: amount,
-        currency: "BTC",
+        currency: "USDT",
         callbackUrl: callbackUrl,
         description: user_id
     }
