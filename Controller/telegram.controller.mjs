@@ -916,6 +916,23 @@ const onCallBackQuery = async (callback) => {
 
         if (command === "/deleteProduct") {
             const pid = parseInt(array[0])
+            return await Bot.editMessageText("<i>❓Are you sure to delete?</i>", {
+                chat_id: chat_id,
+                message_id: message_id,
+                parse_mode: "HTML",
+                reply_markup: {
+                    inline_keyboard: [
+                        [
+                            { text: "🔙 Back", callback_data: `/admin_products ${pid}` },
+                            { text: "✅ Yes", callback_data: "/confirm_delete " + pid }
+                        ]
+                    ]
+                }
+            })
+        }
+
+        if (command === "/confirm_delete") {
+            const pid = parseInt(array[0])
             await productDB.deleteOne({ _id: pid })
             const text = "✅ Product deleted"
             return await Bot.editMessageText(text, {
