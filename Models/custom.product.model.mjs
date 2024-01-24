@@ -4,7 +4,7 @@ const c_product = new Schema({
     _id: {
         type: Number
     },
-    city: {
+    neighbour: {
         type: String
     },
     name: {

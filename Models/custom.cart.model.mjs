@@ -7,6 +7,9 @@ const c_cart = new Schema({
     location: {
         type: String
     },
+    delivery: {
+        type: Number  
+    },
     product_id: {
         type: Number
     },

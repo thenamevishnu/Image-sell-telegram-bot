@@ -39,10 +39,10 @@ const deleteItem = async (req, res) => {
 
 const c_cartManage = async (req, res) => {
     try {
-        const { product_id, qty, user_id, location } = req.body
+        const { product_id, qty, user_id, location, delivery } = req.body
         const cart = await customCartDB.find({ user_id: user_id, product_id: product_id }) 
         if (cart.length == 0) {
-            await customCartDB.create({user_id: user_id, product_id: product_id, qty: qty, location: location })
+            await customCartDB.create({user_id: user_id, product_id: product_id, qty: qty, location: location, delivery: delivery })
         } else {
             if (qty == 0) {
                 await customCartDB.deleteOne({user_id: user_id, product_id: product_id})

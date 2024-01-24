@@ -18,6 +18,7 @@ import { payoutDB } from "../Models/payout.model.mjs"
 import { customProductDB } from "../Models/custom.product.model.mjs"
 import { customCartDB } from "../Models/custom.cart.model.mjs"
 import { customOrdersDB } from "../Models/custom.orders.model.mjs"
+import { customNeighbourhoodDB } from "../Models/custom.neighbourhood.model.mjs"
 
 env.config()
 
@@ -369,6 +370,8 @@ const adminPanel = async (msg) => {
                 { text: "➕ Add Neighbourhood", callback_data: "/admin_add neighbour" },
                 { text: "➕ Add Custom Product", callback_data: "/admin_add c_product"}
             ], [
+                { text: "➕ Add Custom Neighbourhood", callback_data: "/admin_add c_neighbour" }  
+            ],[
                 { text: "📃 Neighbourhood List", callback_data: "/admin_list neighbour" }  
             ],
             [
@@ -701,18 +704,20 @@ const onCallBackQuery = async (callback) => {
 
         if (command === "/c_select_city") {
             const city = params[0]
-            const text = `🏙️ ${city}\n◾◾◾◾◾\nEnter the exact custom drop location`
-            const key = [
-                ["❌ Cancel"]
-            ]
-            answerCallback[chat_id] = "enter_custom_location"
+            const text = `🏙️ ${city}\n◾◾◾◾◾\nSelect a neighbourhood`
+            const neighbourhood = await customNeighbourhoodDB.find({city: city})
+            const key = neighbourhood.map(item => {
+                return [{text: `${item.name} - (Delivery: ${item.delivery} euro)`, callback_data: `/c_select_neighbour | ${item.name} | ${item.delivery}`}]
+            })
+            const country = answerStore[chat_id].country
+            key.push([{ text: "🔙 Back", callback_data: `/c_select_country | ${country}` }])
             answerStore[chat_id].city = city
-            await Bot.deleteMessage(chat_id, message_id)
-            return await Bot.sendMessage(chat_id, text, {
+            return await Bot.editMessageText(text, {
+                chat_id: chat_id,
+                message_id: message_id,
                 parse_mode: "HTML",
                 reply_markup: {
-                    keyboard: key,
-                    resize_keyboard: true
+                    inline_keyboard: key
                 }
             })
         }
@@ -733,6 +738,26 @@ const onCallBackQuery = async (callback) => {
                 parse_mode: "HTML",
                 reply_markup: {
                     inline_keyboard: key
+                }
+            })
+        }
+
+        if (command === "/c_select_neighbour") {
+            const neighbour = params[0]
+            const delivery = parseFloat(params[1])
+            const text = `🏙️ ${neighbour} - Delivery: ${delivery} euro\n◾◾◾◾◾\nEnter the exact custom drop location`
+            const key = [
+                ["❌ Cancel"]
+            ]
+            answerCallback[chat_id] = "enter_custom_location"
+            answerStore[chat_id].neighbour = neighbour
+            answerStore[chat_id].delivery = delivery
+            await Bot.deleteMessage(chat_id, message_id)
+            return await Bot.sendMessage(chat_id, text, {
+                parse_mode: "HTML",
+                reply_markup: {
+                    keyboard: key,
+                    resize_keyboard: true
                 }
             })
         }
@@ -830,7 +855,8 @@ const onCallBackQuery = async (callback) => {
             }
             const user_id = chat_id
             const location = answerStore[chat_id].custom_location
-            await axios.post(`${process.env.SERVER}/cart/custom/create`, { product_id, user_id, qty, location })
+            const delivery = answerStore[chat_id].delivery
+            await axios.post(`${process.env.SERVER}/cart/custom/create`, { product_id, user_id, qty, location, delivery })
             return await Bot.editMessageReplyMarkup({
                 inline_keyboard: key
             }, {
@@ -968,7 +994,7 @@ const onCallBackQuery = async (callback) => {
             const key = [
                 [{text: "📃 Create Order", callback_data: `/c_create_order ${product_id}`}]
             ]
-            const text = `<b>📦 ${cart[0].product[0].name} (${cart[0].qty}) * ${cart[0].product[0].price} = 💵 ${cart[0].product[0].price * cart[0].qty}\n◾◾◾◾◾◾◾◾◾◾\nTotal: ${cart[0].product[0].price * cart[0].qty} ${cart[0].product[0].currency}</b>`
+            const text = `<b>📦 ${cart[0].product[0].name} (${cart[0].qty}) * ${cart[0].product[0].price} = 💵 ${cart[0].product[0].price * cart[0].qty}\n◾◾◾◾◾◾◾◾◾◾\nTotal: ${( cart[0].product[0].price * cart[0].qty ) + cart[0].delivery} ${cart[0].product[0].currency}\n💵 Product Price: ${cart[0].product[0].price * cart[0].qty} euro\n💰 Delivery: ${cart[0].delivery} euro</b>`
             return await Bot.editMessageText(text, {
                 chat_id: chat_id,
                 message_id: message_id,
@@ -1048,6 +1074,7 @@ const onCallBackQuery = async (callback) => {
                 }
             ])
             const total = cart[0].product[0].price * cart[0].qty
+            const delivery = cart[0].delivery
             const resData = await axios.get('https://min-api.cryptocompare.com/data/price', {
                 params: {
                     fsym: 'BTC',
@@ -1055,12 +1082,12 @@ const onCallBackQuery = async (callback) => {
                 },
             });
             const rate = resData.data.EUR
-            const rateInBTC = total / rate
+            const rateInBTC = (total+delivery) / rate
             const orderId = Math.floor(new Date().getTime() / 1000)
             const cartId = cart[0]._id
             const response = await createPaymentLink(chat_id, rateInBTC, `${process.env.SERVER}/payment/custom/callback/${cartId}`, orderId)
             if (response.result == 100 && response.message == "success") {
-                const text = `<b>📃 Your order <code>#${orderId}</code> is created:\nTotal: 💵 ${total} ${cart[0].product[0].currency}</b>`
+                const text = `<b>📃 Your order <code>#${orderId}</code> is created:\nTotal: 💵 ${total+delivery} ${cart[0].product[0].currency}\n💵 Product Price: ${total} euro\n💰 Delivery: ${delivery} euro</b>`
                 const key = [
                     [{text: "Pay with crypto", url: response.payLink}]
                 ]
@@ -1201,6 +1228,20 @@ const onCallBackQuery = async (callback) => {
                 })
             }
 
+            if (type == "c_neighbour") {
+                const text = `Select city to add neighbourhood!`
+                const cities = await cityDB.find({})
+                const key = cities.map(item => {
+                    return [{text: item.name, callback_data: `/c_add_neighbour_to | ${item.name}`}]
+                })
+                await Bot.sendMessage(chat_id, text, {
+                    parse_mode: "HTML",
+                    reply_markup: {
+                        inline_keyboard: key
+                    }
+                })
+            }
+
             if (type == "product") {
                 const text = `Select neighbourhood to add products!`
                 const neighbour = await neighbourhoodDB.find({})
@@ -1216,10 +1257,10 @@ const onCallBackQuery = async (callback) => {
             }
 
             if (type == "c_product") {
-                const text = `Select city to add products!`
-                const city = await cityDB.find({})
-                const key = city.map(item => {
-                    return [{text: `${item.name} (${item.country})`, callback_data: `/c_add_product_to | ${item._id}`}]
+                const text = `Select neighbourhood to add products!`
+                const neighbour = await customNeighbourhoodDB.find({})
+                const key = neighbour.map(item => {
+                    return [{text: `${item.name} (${item.city})`, callback_data: `/c_add_product_to | ${item._id}`}]
                 })
                 await Bot.sendMessage(chat_id, text, {
                     parse_mode: "HTML",
@@ -1257,6 +1298,16 @@ const onCallBackQuery = async (callback) => {
             })
         }
 
+        if (command === "/c_add_neighbour_to") {
+            const city = params[0]
+            answerStore[chat_id].city = city
+            answerCallback[chat_id] = "c_add_admin_neighbour"
+            const text = `Enter neighbourhood name and delivery price to add in ${city} (Eg: city1|5) or seperate by comma (Eg: city1|5,city2|10,other|25,...)`
+            return await Bot.sendMessage(chat_id, text, {
+                parse_mode: "HTML"
+            })
+        }
+
         if (command === "/add_product_to") {
             const neighbourId = params[0]
             const neighbour = await neighbourhoodDB.findOne({ _id: neighbourId })
@@ -1276,14 +1327,14 @@ const onCallBackQuery = async (callback) => {
         }
 
         if (command === "/c_add_product_to") {
-            const cityid = params[0]
-            const city = await cityDB.findOne({ _id: cityid })
+            const neighbourId = params[0]
+            const neighbour = await customNeighbourhoodDB.findOne({ _id: neighbourId })
             answerCallback[chat_id] = "c_add_product_name"
             const key = [
                 ["❌ Cancel"]
             ]
-            answerStore[chat_id].city = city.name
-            const text = `Adding product to {City: ${city.name}}\n\nEnter your product name`
+            answerStore[chat_id].neighbour = neighbour.name
+            const text = `Adding product to {Neighbourhood: ${neighbour.name}}\n\nEnter your product name`
             return await Bot.sendMessage(chat_id, text, {
                 parse_mode: "HTML",
                 reply_markup: {
@@ -1864,8 +1915,8 @@ const onMessage = async (msg) => {
                     resize_keyboard: true
                 }
             })
-            const city = answerStore[chat_id].city
-            const products = await customProductDB.find({city: city})
+            const neighbour = answerStore[chat_id].neighbour
+            const products = await customProductDB.find({neighbour: neighbour})
             const key = products.map(item => {
                 return [{text: `${item.active ? `✅` : `❌`} ${item.name} 💵 ${item.price} ${item.currency}`, callback_data: `/c_select_product ${item._id}`}]
             })
@@ -2061,6 +2112,29 @@ const onMessage = async (msg) => {
             })
         }
 
+        if (waitfor === "c_add_admin_neighbour") {
+            if (!msg.text) {
+                const text = `<i>✖️ Enter text message</i>`
+                return Bot.sendMessage(chat_id, text, {
+                    parse_mode: "HTML"
+                })
+            }
+            const city = answerStore[chat_id].city
+            msg.text.split(",").forEach(async item => {
+                const param = item.split("|")
+                await customNeighbourhoodDB.create({name: param[0], city: city, delivery: parseFloat(param[1])})
+            })
+            answerCallback[chat_id] = null
+            const text = `✅ Neighbourhoods added`
+            return Bot.sendMessage(chat_id, text, {
+                parse_mode: "HTML",
+                reply_markup: {
+                    keyboard: getMainKey(chat_id),
+                    resize_keyboard: true
+                }
+            })
+        }
+
         if (waitfor === "add_product_name") {
             if (!msg.text) {
                 const text = `<i>✖️ Enter text message</i>`
@@ -2162,7 +2236,7 @@ const onMessage = async (msg) => {
             answerCallback[chat_id] = null
             const findDoc = await customProductDB.findOne().sort({ _id: -1 })
             const key = getMainKey(chat_id)
-            await customProductDB.create({ _id: findDoc ? findDoc._id + 1 : 1, product_image: answerStore[chat_id].product_image, city: answerStore[chat_id].city, currency: "euro", price: answerStore[chat_id].price, name: answerStore[chat_id].name})
+            await customProductDB.create({ _id: findDoc ? findDoc._id + 1 : 1, product_image: answerStore[chat_id].product_image, neighbour: answerStore[chat_id].neighbour, currency: "euro", price: answerStore[chat_id].price, name: answerStore[chat_id].name})
             await Bot.sendMessage(chat_id, `✅ Custom Product saved`, {
                 parse_mode: "HTML",
                 disable_web_page_preview: true,
