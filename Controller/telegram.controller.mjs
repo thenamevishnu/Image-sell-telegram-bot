@@ -12,9 +12,12 @@ import { orderDB } from "../Models/orders.model.mjs"
 import { neighbourhoodDB } from "../Models/neighbourhood.model.mjs"
 import cronJob from "node-cron"
 import { soldDB } from "../Models/sold.model.mjs"
-import { answerCallback, answerStore, getMainKey, getMainText } from "../Utils/Tg.mjs"
+import { answerCallback, answerStore, chatCallback, getMainKey, getMainText } from "../Utils/Tg.mjs"
 import { botConfig } from "../botConfig.mjs"
 import { payoutDB } from "../Models/payout.model.mjs"
+import { customProductDB } from "../Models/custom.product.model.mjs"
+import { customCartDB } from "../Models/custom.cart.model.mjs"
+import { customOrdersDB } from "../Models/custom.orders.model.mjs"
 
 env.config()
 
@@ -74,6 +77,25 @@ const shop = async (msg) => {
     }
 }
 
+const custom = async (msg) => {
+    if(msg.chat.type != "private") return
+    try {
+        const countries = await countryDB.find({})
+        const key = countries.map(item => {
+            return [{text: item.name, callback_data: `/c_select_country | ${item.name}`}]
+        })
+        const text = `🌍 Select a country`
+        return await Bot.sendMessage(msg.chat.id, text, {
+            parse_mode: 'HTML',
+            reply_markup: {
+                inline_keyboard: key
+            }
+        })
+    } catch (err) {
+        console.log(err.message);
+    }
+}
+
 const accountBalance = async (msg) => {
     if(msg.chat.type != "private") return
     try {
@@ -114,7 +136,7 @@ const affiliateLink = async (msg) => {
     }
 }
 
-const cart = async (msg) => {
+const preCart = async (msg) => {
     if(msg.chat.type != "private") return
     try {
         const chat_id = msg.chat.id
@@ -153,7 +175,85 @@ const cart = async (msg) => {
     }
 }
 
+const customCart = async (msg) => {
+    if(msg.chat.type != "private") return
+    try {
+        const chat_id = msg.chat.id
+        const cart = await customCartDB.aggregate([
+            {
+                $match: {
+                    user_id: chat_id
+                }
+            }, {
+                $lookup: {
+                    from: "c_products",
+                    localField: "product_id",
+                    foreignField: "_id",
+                    as: "product"
+                }
+            }
+        ])
+        if (cart.length == 0) {
+            const text = `<code>🛒 Your cart is empty</code>`
+            return await Bot.sendMessage(chat_id, text, {
+                parse_mode: "HTML"
+            })
+        }
+        const text = `🛒 Your cart: ${cart.length} items`
+        const key = cart.map(item => {
+            return [{ text: `${item.product[0].name} (Qty: ${item.qty})`, callback_data: `0` }, {text: "Checkout 🎯", callback_data: `/c_view ${item.product_id}`}, {text: "❌", callback_data: `/c_remove_cart ${item.product_id}`}]
+        })
+        return await Bot.sendMessage(chat_id, text, {
+            parse_mode: "HTML",
+            reply_markup: {
+                inline_keyboard: key
+            }
+        })
+    } catch (err) {
+       console.log(err.message);
+    }
+}
+
+const cart = async (msg) => {
+    if(msg.chat.type != "private") return
+    try {
+        const key = [
+            ["🛒 Pre-Drop", "🛒 Custom-Drop"],
+            ["🔙 Back"]
+        ]
+        return await Bot.sendMessage(msg.chat.id, "<i>🚀 Select type</i>", {
+            parse_mode: "HTML",
+            reply_markup: {
+                keyboard: key,
+                resize_keyboard: true
+            }
+        })
+    } catch (err) {
+        console.log(err.message);
+    }
+}
+
 const orders = async (msg) => {
+    if(msg.chat.type != "private") return
+    try {
+        const text = "🚀 Select type"
+        const key = [
+            ["📃 Pre-Drop Orders", "📃 Custom-Drop Orders"],
+            ["🔙 Back"]
+        ]
+        return Bot.sendMessage(msg.chat.id, text, {
+            parse_mode: "HTML",
+            reply_markup: {
+                keyboard: key,
+                resize_keyboard: true
+            }
+        })
+    } catch (err) {
+        console.log(err.message);
+    }
+}
+
+const preOrders = async (msg) => {
     if(msg.chat.type != "private") return
     try {
         const orders = await orderDB.aggregate([
@@ -179,6 +279,44 @@ const orders = async (msg) => {
         const text = `📦 Your orders: ${orders.length} items`
         const key = orders.map(item => {
             return [{text: `${item.product[0].name} x ${item.qty}`, callback_data: `/view_order ${item._id}`}]
+        })
+        return Bot.sendMessage(msg.chat.id, text, {
+            parse_mode: "HTML",
+            reply_markup: {
+                inline_keyboard: key
+            }
+        })
+    } catch (err) {
+        console.log(err.message);
+    }
+}
+
+const customOrders = async (msg) => {
+    if(msg.chat.type != "private") return
+    try {
+        const orders = await customOrdersDB.aggregate([
+            {
+                $match: {
+                    user_id: msg.chat.id
+                }
+            }, {
+                $lookup: {
+                    from: "c_products",
+                    localField: "product_id",
+                    foreignField: "_id",
+                    as: "product"
+                }
+            }
+        ])
+        if (orders.length == 0) {
+            const text = `There are nothing in your orders!`
+            return Bot.sendMessage(msg.chat.id, text, {
+                parse_mode: "HTML"
+            })
+        }
+        const text = `📦 Your orders: ${orders.length} items`
+        const key = orders.map(item => {
+            return [{text: `${item.product[0].name} x ${item.qty}`, callback_data: `/c_view_order ${item._id}`},{text: "💬 Chat", callback_data: `/chat ${item._id}`}]
         })
         return Bot.sendMessage(msg.chat.id, text, {
             parse_mode: "HTML",
@@ -228,7 +366,8 @@ const adminPanel = async (msg) => {
                 { text: "➕ Add Product", callback_data: "/admin_add product" },
                 { text: "➕ Add City", callback_data: "/admin_add city" }
             ], [
-                { text: "➕ Add Neighbourhood", callback_data: "/admin_add neighbour" }  
+                { text: "➕ Add Neighbourhood", callback_data: "/admin_add neighbour" },
+                { text: "➕ Add Custom Product", callback_data: "/admin_add c_product"}
             ], [
                 { text: "📃 Neighbourhood List", callback_data: "/admin_list neighbour" }  
             ],
@@ -277,6 +416,142 @@ const onCallBackQuery = async (callback) => {
 
         if (!answerStore[chat_id]) {
             answerStore[chat_id] = {}
+        }
+
+        if (command === "/replymsg") {
+            const uid = parseInt(array[0])
+            answerStore[chat_id].replymsg = uid
+            answerStore[chat_id].replying = message_id
+            answerStore[chat_id].msg_id = message_id
+            answerStore[chat_id].reply_markup = JSON.stringify(callback.message.reply_markup.inline_keyboard)
+            answerCallback[chat_id] = "replymsg_admin"
+            const text = "Enter the reply"
+            return await Bot.sendMessage(chat_id, text, {
+                reply_markup: {
+                    keyboard: [
+                        ["❌ Cancel"]
+                    ],
+                    resize_keyboard: true
+                }
+            })
+        }
+
+        if (command === "/mark_sold") {
+            const id = array[0]
+            const resData = await customOrdersDB.findOne({ _id: id })
+            const key = callback.message.reply_markup.inline_keyboard
+            if (resData.done) {
+                await customOrdersDB.updateOne({ _id: new Types.ObjectId(id) }, { done: false })
+                key.pop()
+                key.push([{ text: "Status: Not Sold ❌", callback_data: "/mark_sold " + id }])
+                chatCallback[resData.user_id] = null
+            } else {
+                await customOrdersDB.updateOne({ _id: new Types.ObjectId(id) }, { done: true })
+                key.pop()
+                key.push([{ text: "Status: Sold ✅", callback_data: "/mark_sold " + id }])
+                chatCallback[resData.user_id] = id
+            }
+            await Bot.editMessageReplyMarkup({
+                inline_keyboard: key
+            }, {
+                chat_id: chat_id,
+                message_id: message_id
+            })
+            return await Bot.answerCallbackQuery(callback.id, {
+                text: `✅ This order marked as: ${resData.done ? "❌ Not Sold" : "✅ Sold"}!`,
+                show_alert: true
+            })
+        }
+
+        if (command === "/seeLocation") {
+            const id = array[0]
+            const orders = await customOrdersDB.aggregate([
+                {
+                    $match: {
+                        _id: new Types.ObjectId(id)
+                    }
+                }, {
+                    $lookup: {
+                        from: "c_products",
+                        localField: "product_id",
+                        foreignField: "_id",
+                        as: "product"
+                    }
+                }
+            ])
+            const text = `City: ${orders[0].city}\nLocation: ${orders[0].location}`
+            return await Bot.answerCallbackQuery(callback.id, {
+                text: text,
+                show_alert: true
+            })
+        }
+
+        if (command === "/seeProductInfo") {
+            const id = array[0]
+            const orders = await customOrdersDB.aggregate([
+                {
+                    $match: {
+                        _id: new Types.ObjectId(id)
+                    }
+                }, {
+                    $lookup: {
+                        from: "c_products",
+                        localField: "product_id",
+                        foreignField: "_id",
+                        as: "product"
+                    }
+                }
+            ])
+            const text = `Product: ${orders[0].product[0].name}\nQty: ${orders[0].qty}\nStatus: Paid`
+            return await Bot.answerCallbackQuery(callback.id, {
+                text: text,
+                show_alert: true
+            })
+        }
+
+        if (command === "/seeMessageFrom") {
+            const id = parseInt(array[0])
+            const response = await Bot.getChat(id)
+            const text = `FirstName: ${response.first_name}\nLastName: ${response.last_name}\nUserName: @${response.username}\nID: ${response.id}`
+            return await Bot.answerCallbackQuery(callback.id, {
+                text: text,
+                show_alert: true
+            })
+        }
+
+        if (command === "/chat") {
+            const currentOrder = array[0]
+            chatCallback[chat_id] = currentOrder
+            const orders = await customOrdersDB.aggregate([
+                {
+                    $match: {
+                        _id: new Types.ObjectId(currentOrder)
+                    }
+                }, {
+                    $lookup: {
+                        from: "c_products",
+                        localField: "product_id",
+                        foreignField: "_id",
+                        as: "product"
+                    }
+                }
+            ])
+            if (orders[0].done) {
+                return await Bot.answerCallbackQuery(callback.id, {
+                    text: "✅ This order marked as Sold!",
+                    show_alert: true
+                })
+            }
+            const text = `<i>💬 Chat session started: ${orders[0].product[0].name}-x${orders[0].qty}\n🌍 Location: ${orders[0].location}</i>`
+            return await Bot.sendMessage(chat_id, text, {
+                parse_mode: "HTML",
+                reply_markup: {
+                    keyboard: [
+                        ["❌ Cancel"]
+                    ],
+                    resize_keyboard: true
+                }
+            })
         }
 
         if (query === "/referral_list") {
@@ -349,6 +624,23 @@ const onCallBackQuery = async (callback) => {
             })
         }
 
+        if (query === "/custom") {
+            const countries = await countryDB.find({})
+            const key = countries.map(item => {
+                return [{text: item.name, callback_data: `/c_select_country | ${item.name}`}]
+            })
+            const text = `🌍 Select a country`
+            answerStore[chat_id] = {}
+            return await Bot.editMessageText(text, {
+                chat_id: chat_id,
+                message_id: message_id,
+                parse_mode: 'HTML',
+                reply_markup: {
+                    inline_keyboard: key
+                }
+            })
+        }
+
         if (command === "/select_country") {
             const country = params[0]
             const text = `🏙️ Select a city`
@@ -357,6 +649,25 @@ const onCallBackQuery = async (callback) => {
                 return [{text: item.name, callback_data: `/select_city | ${item.name}`}]
             })
             key.push([{ text: "🔙 Back", callback_data: "/shop" }])
+            answerStore[chat_id].country = country
+            return await Bot.editMessageText(text, {
+                chat_id: chat_id,
+                message_id: message_id,
+                parse_mode: "HTML",
+                reply_markup: {
+                    inline_keyboard: key
+                }
+            })
+        }
+
+        if (command === "/c_select_country") {
+            const country = params[0]
+            const text = `🏙️ Select a city`
+            const cities = await cityDB.find({country: country})
+            const key = cities.map(item => {
+                return [{text: item.name, callback_data: `/c_select_city | ${item.name}`}]
+            })
+            key.push([{ text: "🔙 Back", callback_data: "/custom" }])
             answerStore[chat_id].country = country
             return await Bot.editMessageText(text, {
                 chat_id: chat_id,
@@ -388,6 +699,24 @@ const onCallBackQuery = async (callback) => {
             })
         }
 
+        if (command === "/c_select_city") {
+            const city = params[0]
+            const text = `🏙️ ${city}\n◾◾◾◾◾\nEnter the exact custom drop location`
+            const key = [
+                ["❌ Cancel"]
+            ]
+            answerCallback[chat_id] = "enter_custom_location"
+            answerStore[chat_id].city = city
+            await Bot.deleteMessage(chat_id, message_id)
+            return await Bot.sendMessage(chat_id, text, {
+                parse_mode: "HTML",
+                reply_markup: {
+                    keyboard: key,
+                    resize_keyboard: true
+                }
+            })
+        }
+
         if (command === "/select_neighbour") {
             const neighbour = params[0]
             const text = `🏙️ ${neighbour}\n◾◾◾◾◾\nSelect a product`
@@ -412,12 +741,41 @@ const onCallBackQuery = async (callback) => {
             const product_id = array[0]
             const product = await productDB.findOne({ _id: product_id })
             if (!product.active) {
-                return Bot.answerCallbackQuery(callback.id, "✖️ Product is not available!")
+                return Bot.answerCallbackQuery(callback.id, {
+                    text: "✖️ Product is not available!",
+                    show_alert: true
+                })
             }
             const text = `🏙️ ${product.neighbourhood}\n◾◾◾◾◾\n📦 ${product.name}\n💵 ${product.price} ${product.currency}\nℹ️ No description`
             const key = [[
                 {
                     text:"➕ Add to cart", callback_data: `/addtocart ${product_id} 1`
+                }
+            ]]
+            await Bot.deleteMessage(chat_id, message_id)
+            return await Bot.sendPhoto(chat_id, product.product_image, {
+                caption: text,
+                parse_mode: "HTML",
+                reply_markup: {
+                    inline_keyboard: key
+                }
+            })
+        }
+
+        if (command === "/c_select_product") {
+            const product_id = array[0]
+            const product = await customProductDB.findOne({ _id: product_id })
+            if (!product.active) {
+                return Bot.answerCallbackQuery(callback.id, {
+                    text: "✖️ Product is not available!",
+                    show_alert: true
+                })
+            }
+            const location = answerStore[chat_id].custom_location
+            const text = `🏙️ ${location}\n◾◾◾◾◾\n📦 ${product.name}\n💵 ${product.price} ${product.currency}\nℹ️ No description`
+            const key = [[
+                {
+                    text:"➕ Add to cart", callback_data: `/c_addtocart ${product_id} 1`
                 }
             ]]
             await Bot.deleteMessage(chat_id, message_id)
@@ -447,6 +805,32 @@ const onCallBackQuery = async (callback) => {
             }
             const user_id = chat_id
             await axios.post(`${process.env.SERVER}/cart/create`, { product_id, user_id, qty })
+            return await Bot.editMessageReplyMarkup({
+                inline_keyboard: key
+            }, {
+                chat_id: chat_id,
+                message_id: message_id
+            })
+        }
+
+        if (command === "/c_addtocart") {
+            const product_id = array[0]
+            const qty = parseInt(array[1])
+            let key = null
+            if (qty == 0) {
+                key = [
+                    [{text:"➕ Add to cart", callback_data: `/addtocart ${product_id} 1`}]
+                ]
+            } else {
+                key = [[
+                    {text: "➖", callback_data: `/c_addtocart ${product_id} ${qty - 1}`},
+                    {text:`🛒 ${qty}`, callback_data: "0"},
+                    {text: "➕", callback_data: `/c_addtocart ${product_id} ${qty + 1}`}
+                ]]
+            }
+            const user_id = chat_id
+            const location = answerStore[chat_id].custom_location
+            await axios.post(`${process.env.SERVER}/cart/custom/create`, { product_id, user_id, qty, location })
             return await Bot.editMessageReplyMarkup({
                 inline_keyboard: key
             }, {
@@ -494,6 +878,45 @@ const onCallBackQuery = async (callback) => {
             })
         }
 
+        if (command === "/c_remove_cart") {
+            const product_id = array[0]
+            await axios.delete(`${process.env.SERVER}/cart/custom/delete/${product_id}/${chat_id}`)
+            const cart = await customCartDB.aggregate([
+                {
+                    $match: {
+                        user_id: chat_id
+                    }
+                }, {
+                    $lookup: {
+                        from: "c_products",
+                        localField: "product_id",
+                        foreignField: "_id",
+                        as: "product"
+                    }
+                }
+            ])
+            if (cart.length == 0) {
+                const text = `<code>🛒 Your cart is empty</code>`
+                return await Bot.editMessageText(text, {
+                    chat_id: chat_id,
+                    message_id: message_id,
+                    parse_mode: "HTML"
+                })
+            }
+            const text = `🛒 Your cart: ${cart.length} items`
+            const key = cart.map(item => {
+                return [{text: `${item.product[0].name} (Qty: ${item.qty})`, callback_data: `/c_view ${item.product_id}`},{text: "❌", callback_data: `/remove_cart ${item.product_id}`}]
+            })
+            return await Bot.editMessageText(text, {
+                chat_id: chat_id,
+                message_id: message_id,
+                parse_mode: "HTML",
+                reply_markup: {
+                    inline_keyboard: key
+                }
+            })
+        }
+
         if (command === "/view") {
             const product_id = parseInt(array[0])
             const cart = await cartDB.aggregate([
@@ -525,6 +948,37 @@ const onCallBackQuery = async (callback) => {
             })
         }
 
+        if (command === "/c_view") {
+            const product_id = parseInt(array[0])
+            const cart = await customCartDB.aggregate([
+                {
+                    $match: {
+                        user_id: chat_id,
+                        product_id: product_id
+                    }
+                }, {
+                    $lookup: {
+                        from: "c_products",
+                        localField: "product_id",
+                        foreignField: "_id",
+                        as: "product"
+                    }
+                }
+            ])
+            const key = [
+                [{text: "📃 Create Order", callback_data: `/c_create_order ${product_id}`}]
+            ]
+            const text = `<b>📦 ${cart[0].product[0].name} (${cart[0].qty}) * ${cart[0].product[0].price} = 💵 ${cart[0].product[0].price * cart[0].qty}\n◾◾◾◾◾◾◾◾◾◾\nTotal: ${cart[0].product[0].price * cart[0].qty} ${cart[0].product[0].currency}</b>`
+            return await Bot.editMessageText(text, {
+                chat_id: chat_id,
+                message_id: message_id,
+                parse_mode: "HTML",
+                reply_markup: {
+                    inline_keyboard: key
+                }
+            })
+        }
+
         if (command === "/create_order") {
             const product_id = parseInt(array[0])
             const cart = await cartDB.aggregate([
@@ -543,7 +997,10 @@ const onCallBackQuery = async (callback) => {
                 }
             ])
             if (cart[0].product[0].location.length<=0) {
-                return await Bot.answerCallbackQuery(callback.id, "❌ No Drop were found in this product")
+                return await Bot.answerCallbackQuery(callback.id, {
+                    text: "❌ No Drop were found in this product",
+                    show_alert: true
+                })
             }
             const total = cart[0].product[0].price * cart[0].qty
             const resData = await axios.get('https://min-api.cryptocompare.com/data/price', {
@@ -557,6 +1014,51 @@ const onCallBackQuery = async (callback) => {
             const orderId = Math.floor(new Date().getTime() / 1000)
             const cartId = cart[0]._id
             const response = await createPaymentLink(chat_id, rateInBTC, `${process.env.SERVER}/payment/callback/${cartId}`, orderId)
+            if (response.result == 100 && response.message == "success") {
+                const text = `<b>📃 Your order <code>#${orderId}</code> is created:\nTotal: 💵 ${total} ${cart[0].product[0].currency}</b>`
+                const key = [
+                    [{text: "Pay with crypto", url: response.payLink}]
+                ]
+                return await Bot.sendMessage(chat_id, text, {
+                    parse_mode: "HTML",
+                    reply_markup: {
+                        inline_keyboard: key
+                    }
+                })
+            } else {
+                return await Bot.sendMessage(chat_id, "Error happend")
+            }
+        }
+
+        if (command === "/c_create_order") {
+            const product_id = parseInt(array[0])
+            const cart = await customCartDB.aggregate([
+                {
+                    $match: {
+                        user_id: chat_id,
+                        product_id: product_id
+                    }
+                }, {
+                    $lookup: {
+                        from: "c_products",
+                        localField: "product_id",
+                        foreignField: "_id",
+                        as: "product"
+                    }
+                }
+            ])
+            const total = cart[0].product[0].price * cart[0].qty
+            const resData = await axios.get('https://min-api.cryptocompare.com/data/price', {
+                params: {
+                    fsym: 'BTC',
+                    tsyms: 'EUR',
+                },
+            });
+            const rate = resData.data.EUR
+            const rateInBTC = total / rate
+            const orderId = Math.floor(new Date().getTime() / 1000)
+            const cartId = cart[0]._id
+            const response = await createPaymentLink(chat_id, rateInBTC, `${process.env.SERVER}/payment/custom/callback/${cartId}`, orderId)
             if (response.result == 100 && response.message == "success") {
                 const text = `<b>📃 Your order <code>#${orderId}</code> is created:\nTotal: 💵 ${total} ${cart[0].product[0].currency}</b>`
                 const key = [
@@ -599,6 +1101,38 @@ const onCallBackQuery = async (callback) => {
             const text = `<b>📦 ${orderInfo.product[0].name}\n🌍 Location: ${orderInfo.location.url}\n🛒 Qty: <code>${orderInfo.qty}</code>\n💵 Total Amount: <code>${orderInfo.payment.amount} ${orderInfo.payment.currency}</code>\n📃 OrderId: <code>#${orderInfo.payment.orderId}</code>\n#️⃣ txID: <code>${orderInfo.payment.txID}</code>\n\nDate: <code>${new Date(orderInfo.payment.date * 1000).toUTCString()}</code></b>`
             await Bot.deleteMessage(chat_id, message_id)
             return Bot.sendPhoto(chat_id, orderInfo.location.photo, {
+                caption: text,
+                parse_mode: "HTML",
+                disable_web_page_preview: true
+            })
+        }
+
+        if (command === "/c_view_order") {
+            const orderId = array[0]
+            const order = await customOrdersDB.aggregate([
+                {
+                    $match: {
+                        _id: new Types.ObjectId(orderId)
+                    }
+                }, {
+                    $lookup: {
+                        from: "c_products",
+                        localField: "product_id",
+                        foreignField: "_id",
+                        as: "product"
+                    }
+                }
+            ])
+            if (order.length==0) {
+                const text = `Can't find your order`
+                return Bot.sendMessage(chat_id, text, {
+                    parse_mode: "HTML"
+                })
+            }
+            const orderInfo = order[0]
+            const text = `<b>📦 ${orderInfo.product[0].name}\n🌍 Location: ${orderInfo.location}\n🛒 Qty: <code>${orderInfo.qty}</code>\n💵 Total Amount: <code>${orderInfo.payment.amount} ${orderInfo.payment.currency}</code>\n📃 OrderId: <code>#${orderInfo.payment.orderId}</code>\n#️⃣ txID: <code>${orderInfo.payment.txID}</code>\n\nDate: <code>${new Date(orderInfo.payment.date * 1000).toUTCString()}</code></b>`
+            await Bot.deleteMessage(chat_id, message_id)
+            return Bot.sendPhoto(chat_id, orderInfo.product[0].product_image, {
                 caption: text,
                 parse_mode: "HTML",
                 disable_web_page_preview: true
@@ -680,6 +1214,20 @@ const onCallBackQuery = async (callback) => {
                     }
                 })
             }
+
+            if (type == "c_product") {
+                const text = `Select city to add products!`
+                const city = await cityDB.find({})
+                const key = city.map(item => {
+                    return [{text: `${item.name} (${item.country})`, callback_data: `/c_add_product_to | ${item._id}`}]
+                })
+                await Bot.sendMessage(chat_id, text, {
+                    parse_mode: "HTML",
+                    reply_markup: {
+                        inline_keyboard: key
+                    }
+                })
+            }
         }
 
         if (command === "/add_city_to") {
@@ -718,6 +1266,24 @@ const onCallBackQuery = async (callback) => {
             ]
             answerStore[chat_id].neighbour = neighbour.name
             const text = `Adding product to {City: ${neighbour.city}}\n\nEnter your product name`
+            return await Bot.sendMessage(chat_id, text, {
+                parse_mode: "HTML",
+                reply_markup: {
+                    keyboard: key,
+                    resize_keyboard: true
+                }
+            })
+        }
+
+        if (command === "/c_add_product_to") {
+            const cityid = params[0]
+            const city = await cityDB.findOne({ _id: cityid })
+            answerCallback[chat_id] = "c_add_product_name"
+            const key = [
+                ["❌ Cancel"]
+            ]
+            answerStore[chat_id].city = city.name
+            const text = `Adding product to {City: ${city.name}}\n\nEnter your product name`
             return await Bot.sendMessage(chat_id, text, {
                 parse_mode: "HTML",
                 reply_markup: {
@@ -956,7 +1522,10 @@ const onCallBackQuery = async (callback) => {
                     }
                 })
             } else {
-                return await Bot.answerCallbackQuery(callback.id, "❌ No Image exist")
+                return await Bot.answerCallbackQuery(callback.id, {
+                    text: "❌ No Image exist",
+                    show_alert: true
+                })
             }
         }
 
@@ -993,7 +1562,10 @@ const onCallBackQuery = async (callback) => {
                     }
                 })
             } else {
-                return await Bot.answerCallbackQuery(callback.id, "❌ No Image exist")
+                return await Bot.answerCallbackQuery(callback.id, {
+                    text: "❌ No Image exist",
+                    show_alert: true
+                })
             }
         }
 
@@ -1032,7 +1604,10 @@ const onCallBackQuery = async (callback) => {
                     }
                 })
             } else {
-                return await Bot.answerCallbackQuery(callback.id, "❌ No Image exist")
+                return await Bot.answerCallbackQuery(callback.id, {
+                    text: "❌ No Image exist",
+                    show_alert: true
+                })
             }
         }
 
@@ -1064,7 +1639,10 @@ const onCallBackQuery = async (callback) => {
                     }
                 })
             } else {
-                return await Bot.answerCallbackQuery(callback.id, "❌ Nothing is here")
+                return await Bot.answerCallbackQuery(callback.id, {
+                    text: "❌ Nothing is here",
+                    show_alert: true
+                })
             }
         }
 
@@ -1101,7 +1679,10 @@ const onCallBackQuery = async (callback) => {
                     }
                 })
             } else {
-                return await Bot.answerCallbackQuery(callback.id, "❌ No Image exist")
+                return await Bot.answerCallbackQuery(callback.id, {
+                    text: "❌ No Image exist",
+                    show_alert: true
+                })
             }
         }
 
@@ -1210,12 +1791,90 @@ const onMessage = async (msg) => {
 
         if (msg.text == "❌ Cancel") {
             answerCallback[chat_id] = null
+            chatCallback[chat_id] = null
             const key = getMainKey(chat_id)
             return await Bot.sendMessage(chat_id, `<i>✖️ Cancelled</i>`, {
                 parse_mode: "HTML",
                 reply_markup: {
                     keyboard: key,
                     resize_keyboard: true
+                }
+            })
+        }
+
+        if (chatCallback[chat_id]) {
+            const currentOrder = chatCallback[chat_id]
+            const msg_id = msg.message_id
+            const resData = await customOrdersDB.findOne({ _id: currentOrder })
+            answerStore[chat_id].msg_id = msg_id
+            const key = [
+                [{text: "🚀 Reply", callback_data: `/replymsg ${chat_id}`}],
+                [{ text: "🌍 See Location", callback_data: "/seeLocation " + currentOrder },{ text: "💬 Message From", callback_data: "/seeMessageFrom " + chat_id }],
+                [{ text: "📃 Product Info", callback_data: "/seeProductInfo " + currentOrder }],
+                [{ text: `Status: ${resData.done ? "Status: Sold ✅" : "Not Sold ❌"}`, callback_data: "/mark_sold " + currentOrder }]
+            ]
+            await Bot.copyMessage(process.env.ADMIN_ID, chat_id, msg_id, {
+                reply_markup: {
+                    inline_keyboard: key
+                }
+            })
+            return await Bot.sendMessage(chat_id, "✅ Message forwarded: awaiting replay")
+        }
+
+        if (waitfor == "replymsg_admin") {
+            const to = answerStore[chat_id].replymsg
+            const msg = answerStore[to].msg_id
+            const edit = answerStore[chat_id].replying
+            const keys = JSON.parse(answerStore[chat_id].reply_markup)
+            keys.shift()
+            keys.unshift([{text: "✅ Replied", callback_data: "0"}])
+            Bot.editMessageReplyMarkup({
+                inline_keyboard: keys
+            },{
+                chat_id: chat_id,
+                message_id: edit
+            })
+            answerCallback[chat_id] = null
+            await Bot.copyMessage(to, chat_id, message_id,{
+                reply_to_message_id: msg
+            })
+            return await Bot.sendMessage(chat_id, "✅ Reply sent!", {
+                reply_markup: {
+                    keyboard: getMainKey(chat_id),
+                    resize_keyboard: true
+                }
+            })
+        }
+
+        if (waitfor === "enter_custom_location") {
+            if (!msg.text) {
+                const text = `<i>✖️ Enter location in text message</i>`
+                return await Bot.sendMessage(chat_id, text, {
+                    parse_mode: "HTML"
+                })
+            }
+            answerCallback[chat_id] = null
+            answerStore[chat_id].custom_location = msg.text
+            const text1 = `<i>✅ Location: ${msg.text}</i>`
+            const key1 = getMainKey(chat_id)
+            await Bot.sendMessage(chat_id, text1, {
+                parse_mode: "HTML",
+                reply_markup: {
+                    keyboard: key1,
+                    resize_keyboard: true
+                }
+            })
+            const city = answerStore[chat_id].city
+            const products = await customProductDB.find({city: city})
+            const key = products.map(item => {
+                return [{text: `${item.active ? `✅` : `❌`} ${item.name} 💵 ${item.price} ${item.currency}`, callback_data: `/c_select_product ${item._id}`}]
+            })
+            const country = answerStore[chat_id].country
+            key.push([{ text: "🔙 Back", callback_data: `/c_select_country | ${country}` }])
+            return await Bot.sendMessage(chat_id, `<i>Select a product</i>`, {
+                parse_mode: "HTML",
+                reply_markup: {
+                    inline_keyboard: key
                 }
             })
         }
@@ -1416,6 +2075,20 @@ const onMessage = async (msg) => {
             })  
         }
 
+        if (waitfor === "c_add_product_name") {
+            if (!msg.text) {
+                const text = `<i>✖️ Enter text message</i>`
+                return Bot.sendMessage(chat_id, text, {
+                    parse_mode: "HTML"
+                })
+            }
+            answerStore[chat_id].name = msg.text
+            answerCallback[chat_id] = "c_add_product_price"
+            return await Bot.sendMessage(chat_id, `<i>Enter price in digits (EUR) (Eg: 5)</i>`, {
+                parse_mode: "HTML"
+            })  
+        }
+
         if (waitfor === "add_product_price") {
             if (!msg.text) {
                 const text = `<i>✖️ Enter text message</i>`
@@ -1436,6 +2109,26 @@ const onMessage = async (msg) => {
             })
         }
 
+        if (waitfor === "c_add_product_price") {
+            if (!msg.text) {
+                const text = `<i>✖️ Enter text message</i>`
+                return Bot.sendMessage(chat_id, text, {
+                    parse_mode: "HTML"
+                })
+            }
+            if (isNaN(msg.text)) {
+                const text = `<i>✖️ Enter numeric value</i>`
+                return Bot.sendMessage(chat_id, text, {
+                    parse_mode: "HTML"
+                })
+            }
+            answerStore[chat_id].price = parseFloat(msg.text)
+            answerCallback[chat_id] = "c_add_product_image"
+            return await Bot.sendMessage(chat_id, `<i>Send product Image</i>`, {
+                parse_mode: "HTML"
+            })
+        }
+
         if (waitfor === "add_product_image") {
             if (!msg?.photo?.[0]?.file_id) {
                 const text = `<i>✖️ Send a valid image or compress the image while send!</i>`
@@ -1447,9 +2140,36 @@ const onMessage = async (msg) => {
             const findDoc = await productDB.findOne().sort({ _id: -1 })
             const key = getMainKey(chat_id)
             await productDB.create({ _id: findDoc ? findDoc._id + 1 : 1, product_image: answerStore[chat_id].product_image, neighbourhood: answerStore[chat_id].neighbour, currency: "euro", price: answerStore[chat_id].price, name: answerStore[chat_id].name})
+            answerCallback[chat_id] = null
             await Bot.sendMessage(chat_id, `✅ Product saved`, {
                 parse_mode: "HTML",
-                disable_web_page_preview: true
+                disable_web_page_preview: true,
+                reply_markup: {
+                    keyboard: key,
+                    resize_keyboard: true
+                }
+            })
+        }
+
+        if (waitfor === "c_add_product_image") {
+            if (!msg?.photo?.[0]?.file_id) {
+                const text = `<i>✖️ Send a valid image or compress the image while send!</i>`
+                return Bot.sendMessage(chat_id, text, {
+                    parse_mode: "HTML"
+                })
+            }
+            answerStore[chat_id].product_image = msg.photo[0].file_id
+            answerCallback[chat_id] = null
+            const findDoc = await customProductDB.findOne().sort({ _id: -1 })
+            const key = getMainKey(chat_id)
+            await customProductDB.create({ _id: findDoc ? findDoc._id + 1 : 1, product_image: answerStore[chat_id].product_image, city: answerStore[chat_id].city, currency: "euro", price: answerStore[chat_id].price, name: answerStore[chat_id].name})
+            await Bot.sendMessage(chat_id, `✅ Custom Product saved`, {
+                parse_mode: "HTML",
+                disable_web_page_preview: true,
+                reply_markup: {
+                    keyboard: key,
+                    resize_keyboard: true
+                }
             })
         }
 
@@ -1557,10 +2277,15 @@ const onMessage = async (msg) => {
 export default {
     start,
     shop,
+    custom,
     accountBalance,
     affiliateLink,
     cart,
+    preCart,
+    customCart,
     orders,
+    preOrders,
+    customOrders,
     support,
     adminPanel,
     onCallBackQuery,

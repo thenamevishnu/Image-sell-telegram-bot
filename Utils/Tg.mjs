@@ -5,8 +5,8 @@ env.config()
 export const getMainKey = (chat_id) => {
     const key = [
         ["💷 Account Balance"],
-        ["⭐ Shop", "🫳 Affiliate Link", "📃 Orders"],
-        ["💬 Support", "🛒 Cart"]
+        ["⭐ Shop", "🫳 Affiliate", "💫 Custom"],
+        ["💬 Support", "🛒 Cart", "📃 Orders"]
     ]
     if (process.env.ADMIN_ID == chat_id) {
         key.push(["⚙️ Admin Settings"])
@@ -20,3 +20,4 @@ export const getMainText = () => {
 
 export const answerCallback = {}
 export const answerStore = {}
+export const chatCallback = {}
