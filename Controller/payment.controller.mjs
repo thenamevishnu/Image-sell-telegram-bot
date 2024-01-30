@@ -180,13 +180,6 @@ const customPaymentCallback = async (req, res) => {
                         parse_mode: "HTML"
                     })
                     const userinfo = await Bot.getChat(postData.description)
-                    const inviter = await userDB.findOne({ _id: userinfo.id })
-                    const InvitedBy = inviter.inviter
-                    if (InvitedBy && InvitedBy != 0) {
-                        const commission = parseFloat(postData.amount) * 0.1
-                        await userDB.updateOne({ _id: InvitedBy }, { $inc: { balance: commission } })
-                        await Bot.sendMessage(InvitedBy, `<i>💷 Referral Income: +${commission} ${postData.currency}</i>`)
-                    }
                     const uname = userinfo.username ? `@${userinfo.username}` : `<a href='tg://user?id=${userinfo.id}'>${userinfo.first_name}</a>`
                     await Bot.sendPhoto(process.env.ADMIN_ID, image, {
                         caption: `✅ Sold custom drop to ${uname}\n📦 ${name}\n🛒 Qty: ${Qty}\n${city} - ${location}`,
