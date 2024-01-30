@@ -357,7 +357,6 @@ const adminPanel = async (msg) => {
         if (process.env.ADMIN_ID != chat_id) {
             return
         }
-        const products = await productDB.find({})
         const key = [
             [
                 {text: "🛰️ Broadcast to users", callback_data: "/broadcast"}
@@ -381,19 +380,9 @@ const adminPanel = async (msg) => {
             ],
             [
                 {text: "👇 product List 👇", callback_data: "0"}
-            ]
+            ],
+            [{text:"📦 Pre-Drops", callback_data:"/list_products pre-drops"},{text:"📦 Custom-Drops", callback_data:"/list_products custom-drops"}]
         ]
-        if (products.length > 0) {
-            const keys = products.map(item => {
-                const items =  [
-                    {
-                        text: `${item.name} - ${item.price} ${item.currency}`, callback_data: `/admin_products ${item._id}`
-                    }
-                ]
-                key.push(items)
-                return true
-            })
-        }
         const text = "Admin Panel"
         return Bot.sendMessage(chat_id, text, {
             parse_mode: "HTML",
@@ -419,6 +408,59 @@ const onCallBackQuery = async (callback) => {
 
         if (!answerStore[chat_id]) {
             answerStore[chat_id] = {}
+        }
+
+        if (command === "/list_products") {
+            const type = array[0]
+            const key = []
+
+            if (type == "pre-drops") {
+                const products = await productDB.find({})
+                if (products.length > 0) {
+                    const keys = products.map(item => {
+                        const items =  [
+                            {
+                                text: `${item.name} - ${item.price} ${item.currency}`, callback_data: `/admin_products ${item._id} 0`
+                            }
+                        ]
+                        key.push(items)
+                        return true
+                    })
+                }
+                const text = type
+                return await Bot.editMessageText(text, {
+                    chat_id: chat_id,
+                    message_id: message_id,
+                    reply_markup: {
+                        inline_keyboard: key
+                    },
+                    parse_mode: "HTML"
+                })
+            }
+
+            if (type == "custom-drops") {
+                const products = await customProductDB.find({})
+                if (products.length > 0) {
+                    const keys = products.map(item => {
+                        const items =  [
+                            {
+                                text: `${item.name} - ${item.price} ${item.currency}`, callback_data: `/admin_products ${item._id} 1`
+                            }
+                        ]
+                        key.push(items)
+                        return true
+                    })
+                }
+                const text = type
+                return await Bot.editMessageText(text, {
+                    chat_id: chat_id,
+                    message_id: message_id,
+                    reply_markup: {
+                        inline_keyboard: key
+                    },
+                    parse_mode: "HTML"
+                })
+            }
         }
 
         if (command === "/replymsg") {
@@ -1347,14 +1389,17 @@ const onCallBackQuery = async (callback) => {
         if (command === "/status_change") {
             const product_id = parseInt(array[0])
             const status = array[1]
-            await productDB.updateOne({ _id: product_id }, { $set: { active: status } })
-            const product = await productDB.findOne({_id: product_id})
+            const ptype = array[2]
+            ptype==0 ? await productDB.updateOne({ _id: product_id }, { $set: { active: status } }) : await customProductDB.updateOne({ _id: product_id }, { $set: { active: status } })
+            let product = ptype==0?await productDB.findOne({_id: product_id}):await customProductDB.findOne({_id: product_id})
             const key = [
-                [{ text: `${product.active ? `✅ Active` : `❌ Disabled`}`, callback_data: `/status_change ${product_id} ${!product.active}` }, { text: `❌ Delete`, callback_data: `/deleteProduct ${product_id}` }],
-                [{ text: "View Product Image", callback_data: `/admin_view_pimage ${product_id}`},{text: "View Drop", callback_data: `/admin_view_drop ${product_id}`}],
-                [{ text: `🖊️ Edit Name`, callback_data: `/admin_change Name ${product_id}` }, { text: `🖊️ Edit Image`, callback_data: `/admin_change Pimage ${product_id}` }, { text: `🖊️ Edit Price`, callback_data: `/admin_change Price ${product_id}` }],
-                [{ text: "🖊️ Add/Change Drop", callback_data: `/admin_change Drop ${product_id}`}]
+                [{ text: `${product.active ? `✅ Active` : `❌ Disabled`}`, callback_data: `/status_change ${product_id} ${!product.active} ${ptype}` }, { text: `❌ Delete`, callback_data: `/deleteProduct ${product_id} ${ptype}` }],
+                [{ text: "View Product Image", callback_data: `/admin_view_pimage ${product_id} ${ptype}`}],
+                [{ text: `🖊️ Edit Name`, callback_data: `/admin_change Name ${product_id} ${ptype}` }, { text: `🖊️ Edit Image`, callback_data: `/admin_change Pimage ${product_id} ${ptype}` }, { text: `🖊️ Edit Price`, callback_data: `/admin_change Price ${product_id} ${ptype}` }],
+                
             ]
+            ptype==0 && key.push([{text: "View Drop", callback_data: `/admin_view_drop ${product_id}`}, { text: "🖊️ Add/Change Drop", callback_data: `/admin_change Drop ${product_id}`}])
+            key.push([{text: "🔙 Back", callback_data: `/list_products ${ptype==0?"pre-drops":"custom-drops"}`}])
             return Bot.editMessageReplyMarkup({
                 inline_keyboard: key
             }, {
@@ -1449,14 +1494,22 @@ const onCallBackQuery = async (callback) => {
 
         if (command === "/admin_products") {
             const product_id = parseInt(array[0])
-            const product = await productDB.findOne({_id: product_id})
+            const ptype = array[1]
+            let product = null
+            if (ptype == 0) {
+                product = await productDB.findOne({_id: product_id})
+            } else {
+                product = await customProductDB.findOne({_id: product_id})
+            }
             const text = `<b>Title: ${product.name}\nPrice: ${product.price} ${product.currency}\n</b>`
             const key = [
-                [{ text: `${product.active ? `✅ Active` : `❌ Disabled`}`, callback_data: `/status_change ${product_id} ${!product.active}` }, { text: `❌ Delete`, callback_data: `/deleteProduct ${product_id}` }],
-                [{ text: "View Product Image", callback_data: `/admin_view_pimage ${product_id}`},{text: "View Drop", callback_data: `/admin_view_drop ${product_id}`}],
-                [{ text: `🖊️ Edit Name`, callback_data: `/admin_change Name ${product_id}` }, { text: `🖊️ Edit Image`, callback_data: `/admin_change Pimage ${product_id}` }, { text: `🖊️ Edit Price`, callback_data: `/admin_change Price ${product_id}` }],
-                [{ text: "🖊️ Add/Change Drop", callback_data: `/admin_change Drop ${product_id}`}]
+                [{ text: `${product.active ? `✅ Active` : `❌ Disabled`}`, callback_data: `/status_change ${product_id} ${!product.active} ${ptype}` }, { text: `❌ Delete`, callback_data: `/deleteProduct ${product_id} ${ptype}` }],
+                [{ text: "View Product Image", callback_data: `/admin_view_pimage ${product_id} ${ptype}`}],
+                [{ text: `🖊️ Edit Name`, callback_data: `/admin_change Name ${product_id} ${ptype}` }, { text: `🖊️ Edit Image`, callback_data: `/admin_change Pimage ${product_id} ${ptype}` }, { text: `🖊️ Edit Price`, callback_data: `/admin_change Price ${product_id} ${ptype}` }],
+                
             ]
+            ptype==0 && key.push([{text: "View Drop", callback_data: `/admin_view_drop ${product_id}`}, { text: "🖊️ Add/Change Drop", callback_data: `/admin_change Drop ${product_id}`}])
+            key.push([{text: "🔙 Back", callback_data: `/list_products ${ptype==0?"pre-drops":"custom-drops"}`}])
             return await Bot.editMessageText(text, {
                 chat_id: chat_id,
                 message_id: message_id,
@@ -1470,7 +1523,9 @@ const onCallBackQuery = async (callback) => {
         if (command === "/admin_change") {
             const type = array[0]
             const pid = parseInt(array[1])
+            const ptype = array[2]
             answerStore[chat_id].product_id = pid
+            answerStore[chat_id].ptype = ptype
             if (type == "Name") {
                 const key = [
                     ["❌ Cancel"]
@@ -1533,6 +1588,7 @@ const onCallBackQuery = async (callback) => {
 
         if (command === "/deleteProduct") {
             const pid = parseInt(array[0])
+            const ptype = array[1]
             return await Bot.editMessageText("<i>❓Are you sure to delete?</i>", {
                 chat_id: chat_id,
                 message_id: message_id,
@@ -1540,8 +1596,8 @@ const onCallBackQuery = async (callback) => {
                 reply_markup: {
                     inline_keyboard: [
                         [
-                            { text: "🔙 Back", callback_data: `/admin_products ${pid}` },
-                            { text: "✅ Yes", callback_data: "/confirm_delete " + pid }
+                            { text: "🔙 Back", callback_data: `/admin_products ${pid} ${ptype}` },
+                            { text: "✅ Yes", callback_data: `/confirm_delete ${pid} ${ptype}` }
                         ]
                     ]
                 }
@@ -1550,7 +1606,8 @@ const onCallBackQuery = async (callback) => {
 
         if (command === "/confirm_delete") {
             const pid = parseInt(array[0])
-            await productDB.deleteOne({ _id: pid })
+            const ptype = array[1]
+            ptype==0 ? await productDB.deleteOne({ _id: pid }) : await customProductDB.deleteOne({ _id: pid })
             const text = "✅ Product deleted"
             return await Bot.editMessageText(text, {
                 chat_id: chat_id,
@@ -1561,7 +1618,8 @@ const onCallBackQuery = async (callback) => {
 
         if (command === "/admin_view_pimage") {
             const pid = parseInt(array[0])
-            const product = await productDB.findOne({ _id: pid })
+            const ptype = array[1]
+            const product = ptype==0 ? await productDB.findOne({ _id: pid }) : await customProductDB.findOne({ _id: pid })
             const product_image = product.product_image
             if (product_image) {
                 const key = [
@@ -2255,8 +2313,9 @@ const onMessage = async (msg) => {
                 })
             }
             const pid = answerStore[chat_id].product_id 
+            const ptype = answerStore[chat_id].ptype
             answerCallback[chat_id] = null
-            await productDB.updateOne({ _id: pid }, { $set: { name: msg.text } })
+            ptype==0 ? await productDB.updateOne({ _id: pid }, { $set: { name: msg.text } }) : await customProductDB.updateOne({ _id: pid }, { $set: { name: msg.text } })
             return await Bot.sendMessage(chat_id, "✅ Name updated", {
                 parse_mode: "HTML",
                 reply_markup: {
@@ -2280,8 +2339,9 @@ const onMessage = async (msg) => {
                 })
             }
             const pid = answerStore[chat_id].product_id 
+            const ptype = answerStore[chat_id].ptype
             answerCallback[chat_id] = null
-            await productDB.updateOne({ _id: pid }, { $set: { price: parseFloat(msg.text) } })
+            ptype==0 ? await productDB.updateOne({ _id: pid }, { $set: { price: parseFloat(msg.text) } }) : await customProductDB.updateOne({ _id: pid }, { $set: { price: parseFloat(msg.text) } })
             return await Bot.sendMessage(chat_id, "✅ Price updated", {
                 parse_mode: "HTML",
                 reply_markup: {
@@ -2299,9 +2359,10 @@ const onMessage = async (msg) => {
                 })
             }
             const pid = answerStore[chat_id].product_id 
+            const ptype = answerStore[chat_id].ptype
             answerCallback[chat_id] = null
             const img = msg.photo[0].file_id
-            await productDB.updateOne({ _id: pid }, { $set: { product_image: img } })
+            ptype==0 ? await productDB.updateOne({ _id: pid }, { $set: { product_image: img } }) : await customProductDB.updateOne({ _id: pid }, { $set: { product_image: img } })
             return await Bot.sendMessage(chat_id, "✅ Product image updated", {
                 parse_mode: "HTML",
                 reply_markup: {
