@@ -52,7 +52,9 @@ const c_cartManage = async (req, res) => {
                     product_id: product_id
                 }, {
                     $set: {
-                        qty: qty
+                        qty: qty,
+                        delivery: delivery,
+                        location: location
                     }
                 })
             }

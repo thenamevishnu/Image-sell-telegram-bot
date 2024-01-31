@@ -1299,15 +1299,16 @@ const onCallBackQuery = async (callback) => {
             }
 
             if (type == "c_product") {
-                const text = `Select neighbourhood to add products!`
-                const neighbour = await customNeighbourhoodDB.find({})
-                const key = neighbour.map(item => {
-                    return [{text: `${item.name} (${item.city})`, callback_data: `/c_add_product_to | ${item._id}`}]
-                })
-                await Bot.sendMessage(chat_id, text, {
+                answerCallback[chat_id] = "c_add_product_name"
+                const key = [
+                    ["❌ Cancel"]
+                ]
+                const text = `Enter your custom product name`
+                return await Bot.sendMessage(chat_id, text, {
                     parse_mode: "HTML",
                     reply_markup: {
-                        inline_keyboard: key
+                        keyboard: key,
+                        resize_keyboard: true
                     }
                 })
             }
@@ -1359,24 +1360,6 @@ const onCallBackQuery = async (callback) => {
             ]
             answerStore[chat_id].neighbour = neighbour.name
             const text = `Adding product to {City: ${neighbour.city}}\n\nEnter your product name`
-            return await Bot.sendMessage(chat_id, text, {
-                parse_mode: "HTML",
-                reply_markup: {
-                    keyboard: key,
-                    resize_keyboard: true
-                }
-            })
-        }
-
-        if (command === "/c_add_product_to") {
-            const neighbourId = params[0]
-            const neighbour = await customNeighbourhoodDB.findOne({ _id: neighbourId })
-            answerCallback[chat_id] = "c_add_product_name"
-            const key = [
-                ["❌ Cancel"]
-            ]
-            answerStore[chat_id].neighbour = neighbour.name
-            const text = `Adding product to {Neighbourhood: ${neighbour.name}}\n\nEnter your product name`
             return await Bot.sendMessage(chat_id, text, {
                 parse_mode: "HTML",
                 reply_markup: {
@@ -1974,7 +1957,7 @@ const onMessage = async (msg) => {
                 }
             })
             const neighbour = answerStore[chat_id].neighbour
-            const products = await customProductDB.find({neighbour: neighbour})
+            const products = await customProductDB.find({})
             const key = products.map(item => {
                 return [{text: `${item.active ? `✅` : `❌`} ${item.name} 💵 ${item.price} ${item.currency}`, callback_data: `/c_select_product ${item._id}`}]
             })
@@ -2294,7 +2277,7 @@ const onMessage = async (msg) => {
             answerCallback[chat_id] = null
             const findDoc = await customProductDB.findOne().sort({ _id: -1 })
             const key = getMainKey(chat_id)
-            await customProductDB.create({ _id: findDoc ? findDoc._id + 1 : 1, product_image: answerStore[chat_id].product_image, neighbour: answerStore[chat_id].neighbour, currency: "euro", price: answerStore[chat_id].price, name: answerStore[chat_id].name})
+            await customProductDB.create({ _id: findDoc ? findDoc._id + 1 : 1, product_image: answerStore[chat_id].product_image, currency: "euro", price: answerStore[chat_id].price, name: answerStore[chat_id].name})
             await Bot.sendMessage(chat_id, `✅ Custom Product saved`, {
                 parse_mode: "HTML",
                 disable_web_page_preview: true,

@@ -4,9 +4,6 @@ const c_product = new Schema({
     _id: {
         type: Number
     },
-    neighbour: {
-        type: String
-    },
     name: {
         type: String
     },
