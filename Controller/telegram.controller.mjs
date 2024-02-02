@@ -787,7 +787,7 @@ const onCallBackQuery = async (callback) => {
         if (command === "/c_select_neighbour") {
             const neighbour = params[0]
             const delivery = parseFloat(params[1])
-            const text = `🏙️ ${neighbour} - Delivery: ${delivery} euro\n◾◾◾◾◾\nEnter the exact custom drop location`
+            const text = `🏙️ ${neighbour} - Delivery: ${delivery} euro\n◾◾◾◾◾\nType your address for the delivery 🚚`
             const key = [
                 ["❌ Cancel"]
             ]

@@ -15,7 +15,7 @@ export const getMainKey = (chat_id) => {
 }
 
 export const getMainText = () => {
-    return `Welcome to ${process.env.BOT_NAME}\n\nPay with crypto and receive a location and photo of a pre-dropped package in your city instantly.`
+    return `Welcome to ${process.env.BOT_NAME}\n\nPay with crypto and receive a location and photo of a pre-dropped package in your city instantly.\n\nCourtesy of @cocobale network by @skgbale`
 }
 
 export const answerCallback = {}
