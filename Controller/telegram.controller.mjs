@@ -19,6 +19,7 @@ import { customProductDB } from "../Models/custom.product.model.mjs"
 import { customCartDB } from "../Models/custom.cart.model.mjs"
 import { customOrdersDB } from "../Models/custom.orders.model.mjs"
 import { customNeighbourhoodDB } from "../Models/custom.neighbourhood.model.mjs"
+import { partnersDB } from "../Models/partners.model.mjs"
 
 env.config()
 
@@ -381,7 +382,13 @@ const adminPanel = async (msg) => {
             [
                 {text: "👇 product List 👇", callback_data: "0"}
             ],
-            [{text:"📦 Pre-Drops", callback_data:"/list_products pre-drops"},{text:"📦 Custom-Drops", callback_data:"/list_products custom-drops"}]
+            [
+                { text: "📦 Pre-Drops", callback_data: "/list_products pre-drops" },
+                { text: "📦 Custom-Drops", callback_data: "/list_products custom-drops" }
+            ],[
+                { text: "🤝 Add Partners", callback_data: "/add_partners" },
+                { text: "✌️ Manage Partners", callback_data: "/manage_partners" }
+            ]
         ]
         const text = "Admin Panel"
         return Bot.sendMessage(chat_id, text, {
@@ -408,6 +415,74 @@ const onCallBackQuery = async (callback) => {
 
         if (!answerStore[chat_id]) {
             answerStore[chat_id] = {}
+        }
+
+        if (command === "/add_partners") {
+            const text = `🛰️ Forward any message from your partner!`
+            const key = [
+                ["❌ Cancel"]
+            ]
+            answerCallback[chat_id] = "add_partners"
+            return await Bot.sendMessage(chat_id, text, {
+                parse_mode: "HTML",
+                reply_markup: {
+                    keyboard: key,
+                    resize_keyboard: true
+                }
+            })
+        }
+
+        if (command == "/remove_partner") {
+            const id = array[0]
+            const partner = await partnersDB.findOne({_id: id})
+            const text = `✌️ Are you sure to remove ${partner.first_name} ?`
+            const key = [
+                [{text: "🔙 Back", callback_data: "/manage_partners"},{text: "✅ Yes", callback_data: `/partner_remove ${id}`}]
+            ]
+            return await Bot.sendMessage(chat_id, text, {
+                parse_mode: "HTML",
+                reply_markup: {
+                    inline_keyboard: key
+                }
+            })
+        }
+
+        if (command == "/partner_remove") {
+            const id = array[0]
+            await partnersDB.updateOne({ _id: id }, { $set: { removed: true } })
+            const partner = await partnersDB.find({ removed: false})
+            const key = partner.map(item => {
+                return [
+                    { text: `${item.first_name}`, url: `${item.username ? `https://t.me/${item.username}` : `tg://user?id=${item._id}`}` },
+                    { text: `❌ Remove`, callback_data: `/remove_partner ${item._id}`}
+                ]
+            })
+            const text = `List of partners`
+            return await Bot.editMessageText(text, {
+                chat_id: chat_id,
+                message_id: message_id,
+                parse_mode: "HTML",
+                reply_markup: {
+                    inline_keyboard: key
+                }
+            })
+        }
+
+        if (command === "/manage_partners") {
+            const text = `List of partners`
+            const partner = await partnersDB.find({ removed: false})
+            const key = partner.map(item => {
+                return [
+                    { text: `${item.first_name}`, url: `${item.username ? `https://t.me/${item.username}` : `tg://user?id=${item._id}`}` },
+                    { text: `❌ Remove`, callback_data: `/remove_partner ${item._id}`}
+                ]
+            })
+            return await Bot.sendMessage(chat_id, text, {
+                parse_mode: "HTML",
+                reply_markup: {
+                    inline_keyboard: key
+                }
+            })
         }
 
         if (command === "/list_products") {
@@ -1911,6 +1986,40 @@ const onMessage = async (msg) => {
                 }
             })
             return await Bot.sendMessage(chat_id, "✅ Message forwarded: awaiting replay")
+        }
+
+        if (waitfor == "add_partners") {
+            const forward = msg.forward_from
+            if (!forward) {
+                return await Bot.sendMessage(chat_id, "✖️ Forward a message from your partner!")
+            }
+            const { id, first_name, username, is_bot } = forward
+            if (is_bot) {
+                return await Bot.sendMessage(chat_id, "✖️ Forward a message from your partner!")
+            }
+            const user = await partnersDB.findOne({ _id: id })
+            answerCallback[chat_id] = null
+            if (!user || user.removed) {
+                if (!user) {
+                    await partnersDB.create({
+                        _id: id,
+                        first_name: first_name,
+                        username: username
+                    })
+                } else {
+                    await partnersDB.updateOne({ _id: id},{$set: {removed: false}})
+                }
+                return await Bot.sendMessage(chat_id, `<i>✅ New partner added</i>`, {
+                    parse_mode: "HTML",
+                    reply_markup: {
+                        keyboard: getMainKey(chat_id),
+                        resize_keyboard: true
+                    }
+                })
+            }
+            return await Bot.sendMessage(chat_id, `<i>❌ Partner already exist!</i>`, {
+                parse_mode: "HTML"
+            })
         }
 
         if (waitfor == "replymsg_admin") {

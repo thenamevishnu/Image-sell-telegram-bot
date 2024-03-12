@@ -26,6 +26,7 @@ export const createPayout = async (user_id, receiver_crypto_address, amount, cal
         address: receiver_crypto_address,
         amount: amount,
         currency: "USDT",
+        network: "TRC20",
         callbackUrl: callbackUrl,
         description: user_id
     }
