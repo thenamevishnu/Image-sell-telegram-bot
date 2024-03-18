@@ -11,9 +11,13 @@ const partners = new Schema({
     first_name: {
         type: String
     },
-    removed: {
-        type: Boolean,
-        default: false
+    cities: {
+        type: Array,
+        default: []
+    },
+    products: {
+        type: Array,
+        default: []
     }
 }, {
     timestamps: true

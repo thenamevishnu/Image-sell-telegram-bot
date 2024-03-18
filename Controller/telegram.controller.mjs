@@ -29,7 +29,7 @@ const start = async (msg, match) => {
     if(msg.chat.type != "private") return
     try {
         const text = getMainText()
-        const key = getMainKey(msg.chat.id)
+        const key = await getMainKey(msg.chat.id)
         let inviter = match[1] || 0
         const user = await userDB.findOne({ _id: msg.chat.id })
         if (!user) {
@@ -402,6 +402,30 @@ const adminPanel = async (msg) => {
     }
 }
 
+const partnerPanel = async (msg) => {
+    if(msg.chat.type != "private") return
+    try {
+        const chat_id = msg.chat.id
+        const partners = await partnersDB.find()
+        const partnerList = partners.map(item => item._id)
+        if(!partnerList.includes(chat_id)) return
+        const key = [
+            [
+                {text: "➕ Add Drops", callback_data: "/partner_add_drop"}
+            ]
+        ]
+        const text = "🔐 Partnets Panel"
+        return Bot.sendMessage(chat_id, text, {
+            parse_mode: "HTML",
+            reply_markup: {
+                inline_keyboard: key
+            }
+        })
+    } catch (err) {
+        console.log(err.message);
+    }
+}
+
 const onCallBackQuery = async (callback) => {
     try {
         const query = callback.data
@@ -449,8 +473,8 @@ const onCallBackQuery = async (callback) => {
 
         if (command == "/partner_remove") {
             const id = array[0]
-            await partnersDB.updateOne({ _id: id }, { $set: { removed: true } })
-            const partner = await partnersDB.find({ removed: false})
+            await partnersDB.deleteOne({ _id: id })
+            const partner = await partnersDB.find()
             const key = partner.map(item => {
                 return [
                     { text: `${item.first_name}`, url: `${item.username ? `https://t.me/${item.username}` : `tg://user?id=${item._id}`}` },
@@ -470,11 +494,13 @@ const onCallBackQuery = async (callback) => {
 
         if (command === "/manage_partners") {
             const text = `List of partners`
-            const partner = await partnersDB.find({ removed: false})
+            const partner = await partnersDB.find()
+            Bot.deleteMessage(chat_id, message_id)
             const key = partner.map(item => {
                 return [
                     { text: `${item.first_name}`, url: `${item.username ? `https://t.me/${item.username}` : `tg://user?id=${item._id}`}` },
-                    { text: `❌ Remove`, callback_data: `/remove_partner ${item._id}`}
+                    { text: "🔑 Access", callback_data: `/partner_access ${item._id}`},
+                    { text: `❌ Remove`, callback_data: `/remove_partner ${item._id}` }
                 ]
             })
             return await Bot.sendMessage(chat_id, text, {
@@ -482,6 +508,318 @@ const onCallBackQuery = async (callback) => {
                 reply_markup: {
                     inline_keyboard: key
                 }
+            })
+        }
+
+        if (command === "/partner_add_drop") {
+            const partner = await partnersDB.findOne({ _id: chat_id })
+            if (!partner) {
+                return await Bot.answerCallbackQuery(callback.id, {
+                    text: "❌ Something error happend!",
+                    show_alert: true
+                })
+            }
+            const products = await productDB.find({ _id: { $in: partner.products } })
+            const text = `<b>🛒 Select the product you want to add drops!</b>`
+            const key = products.map(item => {
+                return [
+                    { text: `${item.name}`, callback_data: `/partner_drop_add ${item._id}`}
+                ]
+            })
+            return await Bot.editMessageText(text, {
+                chat_id: chat_id,
+                message_id: message_id,
+                parse_mode: "HTML",
+                reply_markup: {
+                    inline_keyboard: key
+                }
+            })
+        }
+
+        if (command === "/partner_drop_add") {
+            const [product_id] = array
+            const key = [
+                [
+                    { text: "View Drop", callback_data: `/partner_view_drop ${product_id} 0` },
+                    { text: "🖊️ Add/Change Drop", callback_data: `/admin_change Drop ${product_id}` }]
+            ]
+            return await Bot.editMessageText("<i>⚙️ Drop settings</i>", {
+                chat_id: chat_id,
+                message_id: message_id,
+                parse_mode: "HTML",
+                reply_markup: {
+                    inline_keyboard: key
+                }
+            })
+        }
+
+        if (command === "/partner_view_drop") {
+            const pid = parseInt(array[0])
+            const viewIndex = parseInt(array[1])
+            const product = await productDB.findOne({ _id: pid })
+            const locations = product.location.filter(item => item.added === chat_id)
+            const totalPics = locations.length
+            if (totalPics > 0) {
+                const rows = new Array(totalPics).fill(0).map((_, index) => index + 1).filter(item => item !== viewIndex+1)
+                let newRows = []
+                for (let index = 1; index <= Math.ceil(totalPics/5); index++){
+                    newRows.push(rows.splice(0,5))
+                }
+                const key = newRows.map(item => {
+                    return item.map(items => {
+                        return {
+                            text: items,
+                            callback_data: `/partner_view_drop1 ${pid} ${items-1}`
+                        }
+                    })
+                })
+                const back = [{ text: "🔙 Back", callback_data: `/admin_remove_view` }]
+                const del = [{ text: "❌ Delete", callback_data: `/partner_delete_drop ${pid} ${locations[viewIndex]._id}` }]
+                key.push(back)
+                key.unshift(del)
+                return await Bot.sendPhoto(chat_id, locations[viewIndex].photo, {
+                    caption: "1) "+ locations[viewIndex].url || "No Location url",
+                    reply_markup: {
+                        inline_keyboard: key
+                    }
+                })
+            } else {
+                return await Bot.answerCallbackQuery(callback.id, {
+                    text: "❌ Drops are empty or sold out!",
+                    show_alert: true
+                })
+            }
+        }
+
+        if (command === "/partner_view_drop1") {
+            const pid = parseInt(array[0])
+            const viewIndex = parseInt(array[1])
+            const product = await productDB.findOne({ _id: pid })
+            const locations = product.location.filter(item => item.added === chat_id)
+            const totalPics = locations.length
+            if (totalPics > 0) {
+                const rows = new Array(totalPics).fill(0).map((_, index) => index + 1).filter(item => item !== viewIndex+1)
+                let newRows = []
+                for (let index = 1; index <= Math.ceil(totalPics/5); index++){
+                    newRows.push(rows.splice(0,5))
+                }
+                const key = newRows.map(item => {
+                    return item.map(items => {
+                        return {
+                            text: items,
+                            callback_data: `/partner_view_drop1 ${pid} ${items-1}`
+                        }
+                    })
+                })
+                const back = [{ text: "🔙 Back", callback_data: `/admin_remove_view` }]
+                const del = [{ text: "❌ Delete", callback_data: `/partner_delete_drop ${pid} ${locations[viewIndex]._id}` }]
+                key.push(back)
+                key.unshift(del)
+                return await Bot.editMessageMedia({ media: locations[viewIndex].photo, type: "photo", caption: ""+(viewIndex+1)+") "+ locations[viewIndex].url || "No Location url"},{
+                    chat_id: chat_id,
+                    message_id: message_id,
+                    reply_markup: {
+                        inline_keyboard: key
+                    }
+                })
+            } else {
+                return await Bot.answerCallbackQuery(callback.id, {
+                    text: "❌ Drops are empty or sold out!",
+                    show_alert: true
+                })
+            }
+        }
+
+        if (command === "/partner_delete_drop") {
+            const pid = parseInt(array[0])
+            const indexId = array[1]
+            console.log(indexId);
+            const product = await productDB.findOne({ _id: pid })
+            console.log(product.location);
+            const toDelete = product.location.find(item => item._id == indexId)
+            console.log(toDelete);
+            if (product.location.length <= 1) {
+                await productDB.updateOne({ _id: pid }, {active: false})
+            }
+            await productDB.updateOne({ _id: pid }, {$pull: {location: toDelete}})
+            const text = `<i>✅ Drop deleted</i>`
+            await Bot.deleteMessage(chat_id, message_id)
+            return await Bot.sendMessage(chat_id, text, {
+                parse_mode: "HTML"
+            })
+        }
+
+        if (command === "/partner_access") {
+            const userid = array[0]
+            const key = [
+                [
+                    { text: "🏙️ Cities", callback_data: `/parner_cities ${userid}` },
+                    { text: "🛒 Products", callback_data: `/parner_products ${userid}` }
+                ], [
+                    { text: "🔙 Back", callback_data: `/manage_partners` }
+                ]
+            ]
+            const text = `<b>🔑 List of access</b>`
+            return await Bot.editMessageText(text, {
+                chat_id: chat_id,
+                message_id: message_id,
+                parse_mode: "HTML",
+                reply_markup: {
+                    inline_keyboard: key
+                }
+            })
+        }
+
+        if (command === "/parner_cities") {
+            const userid = array[0]
+            const cities = await cityDB.find()
+            const listOfCities = await partnersDB.findOne({ _id: userid })
+            const key = cities.map(item => {
+                return [
+                    { text: `${item.name}`, callback_data: `0` },
+                    { text: `${listOfCities.cities.includes(item._id) ? `✅` : `❌`}`, callback_data: `/partner_ac ${userid} ${item._id}` }
+                ]
+            })
+            key.push([ { text: "🔙 Back", callback_data: `/partner_access ${userid}` } ])
+            const text = `<b>🔑 List of access</b>`
+            return await Bot.editMessageText(text, {
+                chat_id: chat_id,
+                message_id: message_id,
+                parse_mode: "HTML",
+                reply_markup: {
+                    inline_keyboard: key
+                }
+            })
+        }
+
+        if (command === "/partner_ac") {
+            const [userid, itemid] = array
+            const findData = await partnersDB.findOne({ _id: userid })
+            if (findData.cities.includes(new Types.ObjectId(itemid))) {
+                await partnersDB.updateOne({
+                    _id: Number(userid)
+                }, {
+                    $pull: {
+                        cities: new Types.ObjectId(itemid)
+                    }
+                })
+            } else {
+                await partnersDB.updateOne({
+                    _id: Number(userid)
+                }, {
+                    $push: {
+                        cities: new Types.ObjectId(itemid)
+                    }
+                })
+            }
+            const cities = await cityDB.find()
+            const listOfCities = await partnersDB.findOne({ _id: userid })
+            const key = cities.map(item => {
+                return [
+                    { text: `${item.name}`, callback_data: `0` },
+                    { text: `${listOfCities.cities.includes(item._id) ? `✅` : `❌`}`, callback_data: `/partner_ac ${userid} ${item._id}` }
+                ]
+            })
+            key.push([{ text: "🔙 Back", callback_data: `/partner_access ${userid}` }])
+            return await Bot.editMessageReplyMarkup({ inline_keyboard: key }, {
+                chat_id: chat_id,
+                message_id: message_id
+            })
+        }
+
+        if (command === "/parner_products") {
+            const userid = array[0]
+            const listOfCities = await partnersDB.aggregate([
+                {
+                    $match: {
+                        _id: Number(userid)
+                    }
+                }, {
+                    $lookup: {
+                        from: "cities",
+                        localField: "cities",
+                        foreignField: "_id",
+                        as: "cityList"
+                    }
+                }
+            ])
+            const key = listOfCities?.[0]?.cityList?.map(item => {
+                return [
+                    { text: `${item.name}`, callback_data: `/partner_sc ${userid} ${item._id}` }
+                ]
+            })
+            key.push([ { text: "🔙 Back", callback_data: `/partner_access ${userid}` } ])
+            const text = `<b>🏙️ Select city to give product access</b>`
+            return await Bot.editMessageText(text, {
+                chat_id: chat_id,
+                message_id: message_id,
+                parse_mode: "HTML",
+                reply_markup: {
+                    inline_keyboard: key
+                }
+            })
+        }
+
+        if (command === "/partner_sc") {
+            const [userid, itemid] = array
+            const text = `<b>🔑 Product access</b>`
+            const city = await cityDB.findOne({ _id: itemid })
+            const neighbour = await neighbourhoodDB.find({ city: city.name })
+            const neighbourList = neighbour.map(item => item.name )
+            const products = await productDB.find({ neighbourhood: { $in: neighbourList } })
+            const partners = await partnersDB.findOne({ _id: userid })
+            const key = products.map(item => {
+                return [
+                    { text: `${item.name}`, callback_data: `0` },
+                    { text: `${partners.products.includes(item._id) ? `✅` : `❌`}`, callback_data: `/partner_pa ${userid} ${item._id} ${itemid}` }
+                ]
+            })
+            key.push([ { text: "🔙 Back", callback_data: `/parner_products ${userid}` } ])
+            return await Bot.editMessageText(text, {
+                chat_id: chat_id,
+                message_id: message_id,
+                parse_mode: "HTML",
+                reply_markup: {
+                    inline_keyboard: key
+                }
+            })
+        }
+
+        if (command === "/partner_pa") {
+            const [userid, prodid, itemid] = array
+            const findData = await partnersDB.findOne({ _id: userid })
+            if (findData.products.includes(prodid)) {
+                await partnersDB.updateOne({
+                    _id: Number(userid)
+                }, {
+                    $pull: {
+                        products: prodid
+                    }
+                })
+            } else {
+                await partnersDB.updateOne({
+                    _id: Number(userid)
+                }, {
+                    $push: {
+                        products: prodid
+                    }
+                })
+            }
+            const city = await cityDB.findOne({ _id: itemid })
+            const neighbour = await neighbourhoodDB.find({ city: city.name })
+            const neighbourList = neighbour.map(item => item.name )
+            const products = await productDB.find({ neighbourhood: { $in: neighbourList } })
+            const partners = await partnersDB.findOne({ _id: userid })
+            const key = products.map(item => {
+                return [
+                    { text: `${item.name}`, callback_data: `0` },
+                    { text: `${partners.products.includes(item._id) ? `✅` : `❌`}`, callback_data: `/partner_pa ${userid} ${item._id} ${itemid}` }
+                ]
+            })
+            key.push([{ text: "🔙 Back", callback_data: `/parner_products ${userid}` }])
+            return await Bot.editMessageReplyMarkup({ inline_keyboard: key }, {
+                chat_id: chat_id,
+                message_id: message_id
             })
         }
 
@@ -1959,7 +2297,7 @@ const onMessage = async (msg) => {
         if (msg.text == "❌ Cancel") {
             answerCallback[chat_id] = null
             chatCallback[chat_id] = null
-            const key = getMainKey(chat_id)
+            const key = await getMainKey(chat_id)
             return await Bot.sendMessage(chat_id, `<i>✖️ Cancelled</i>`, {
                 parse_mode: "HTML",
                 reply_markup: {
@@ -1991,28 +2329,24 @@ const onMessage = async (msg) => {
         if (waitfor == "add_partners") {
             const forward = msg.forward_from
             if (!forward) {
-                return await Bot.sendMessage(chat_id, "✖️ Forward a message from your partner!")
+                return await Bot.sendMessage(chat_id, "✖️ Forward a message from your partner. If this is a forward message ask them to update their privacy settings!")
             }
             const { id, first_name, username, is_bot } = forward
             if (is_bot) {
-                return await Bot.sendMessage(chat_id, "✖️ Forward a message from your partner!")
+                return await Bot.sendMessage(chat_id, "✖️ The account looks like a bot account!")
             }
             const user = await partnersDB.findOne({ _id: id })
             answerCallback[chat_id] = null
-            if (!user || user.removed) {
-                if (!user) {
-                    await partnersDB.create({
-                        _id: id,
-                        first_name: first_name,
-                        username: username
-                    })
-                } else {
-                    await partnersDB.updateOne({ _id: id},{$set: {removed: false}})
-                }
+            if (!user) {
+                await partnersDB.create({
+                    _id: id,
+                    first_name: first_name,
+                    username: username
+                })
                 return await Bot.sendMessage(chat_id, `<i>✅ New partner added</i>`, {
                     parse_mode: "HTML",
                     reply_markup: {
-                        keyboard: getMainKey(chat_id),
+                        keyboard: await getMainKey(chat_id),
                         resize_keyboard: true
                     }
                 })
@@ -2041,7 +2375,7 @@ const onMessage = async (msg) => {
             })
             return await Bot.sendMessage(chat_id, "✅ Reply sent!", {
                 reply_markup: {
-                    keyboard: getMainKey(chat_id),
+                    keyboard: await getMainKey(chat_id),
                     resize_keyboard: true
                 }
             })
@@ -2057,7 +2391,7 @@ const onMessage = async (msg) => {
             answerCallback[chat_id] = null
             answerStore[chat_id].custom_location = msg.text
             const text1 = `<i>✅ Location: ${msg.text}</i>`
-            const key1 = getMainKey(chat_id)
+            const key1 = await getMainKey(chat_id)
             await Bot.sendMessage(chat_id, text1, {
                 parse_mode: "HTML",
                 reply_markup: {
@@ -2129,7 +2463,7 @@ const onMessage = async (msg) => {
                 await userDB.updateOne({ _id: chat_id }, { $inc: { balance: -(amount) } })
             }
             const text = `✅ Payout Requested\n\n💰 ${inUSDT} USDT ( ${amount} BTC ) to ${address}\n\n🛰️ Status: ${payStatus || "Failed"}`
-            const key = getMainKey(chat_id)
+            const key = await getMainKey(chat_id)
             return await Bot.sendMessage(chat_id, text, {
                 parse_mode: "HTML",
                 reply_markup: {
@@ -2167,7 +2501,7 @@ const onMessage = async (msg) => {
             const key = [
                 [{text: `Reply to ${msg.chat.username ? `@${msg.chat.username}` : `${msg.chat.first_name}`}`, callback_data:`/replyto ${msg.chat.id}`}]
             ]
-            const keys = getMainKey(chat_id)
+            const keys = await getMainKey(chat_id)
             const texts = `<i>✅ Message sent to admin</i>`
             await Bot.sendMessage(chat_id, texts, {
                 parse_mode: "HTML",
@@ -2210,7 +2544,7 @@ const onMessage = async (msg) => {
             return Bot.sendMessage(chat_id, text, {
                 parse_mode: "HTML",
                 reply_markup: {
-                    keyboard: getMainKey(chat_id),
+                    keyboard: await getMainKey(chat_id),
                     resize_keyboard: true
                 }
             })
@@ -2233,7 +2567,7 @@ const onMessage = async (msg) => {
             return Bot.sendMessage(chat_id, text, {
                 parse_mode: "HTML",
                 reply_markup: {
-                    keyboard: getMainKey(chat_id),
+                    keyboard: await getMainKey(chat_id),
                     resize_keyboard: true
                 }
             })
@@ -2256,7 +2590,7 @@ const onMessage = async (msg) => {
             return Bot.sendMessage(chat_id, text, {
                 parse_mode: "HTML",
                 reply_markup: {
-                    keyboard: getMainKey(chat_id),
+                    keyboard: await getMainKey(chat_id),
                     resize_keyboard: true
                 }
             })
@@ -2279,7 +2613,7 @@ const onMessage = async (msg) => {
             return Bot.sendMessage(chat_id, text, {
                 parse_mode: "HTML",
                 reply_markup: {
-                    keyboard: getMainKey(chat_id),
+                    keyboard: await getMainKey(chat_id),
                     resize_keyboard: true
                 }
             })
@@ -2362,7 +2696,7 @@ const onMessage = async (msg) => {
             }
             answerStore[chat_id].product_image = msg.photo[0].file_id
             const findDoc = await productDB.findOne().sort({ _id: -1 })
-            const key = getMainKey(chat_id)
+            const key = await getMainKey(chat_id)
             await productDB.create({ _id: findDoc ? findDoc._id + 1 : 1, product_image: answerStore[chat_id].product_image, neighbourhood: answerStore[chat_id].neighbour, currency: "euro", price: answerStore[chat_id].price, name: answerStore[chat_id].name})
             answerCallback[chat_id] = null
             await Bot.sendMessage(chat_id, `✅ Product saved`, {
@@ -2385,7 +2719,7 @@ const onMessage = async (msg) => {
             answerStore[chat_id].product_image = msg.photo[0].file_id
             answerCallback[chat_id] = null
             const findDoc = await customProductDB.findOne().sort({ _id: -1 })
-            const key = getMainKey(chat_id)
+            const key = await getMainKey(chat_id)
             await customProductDB.create({ _id: findDoc ? findDoc._id + 1 : 1, product_image: answerStore[chat_id].product_image, currency: "euro", price: answerStore[chat_id].price, name: answerStore[chat_id].name})
             await Bot.sendMessage(chat_id, `✅ Custom Product saved`, {
                 parse_mode: "HTML",
@@ -2412,7 +2746,7 @@ const onMessage = async (msg) => {
                 parse_mode: "HTML",
                 reply_markup: {
                     resize_keyboard: true,
-                    keyboard: getMainKey(chat_id)
+                    keyboard: await getMainKey(chat_id)
                 }
             })
         }
@@ -2438,7 +2772,7 @@ const onMessage = async (msg) => {
                 parse_mode: "HTML",
                 reply_markup: {
                     resize_keyboard: true,
-                    keyboard: getMainKey(chat_id)
+                    keyboard: await getMainKey(chat_id)
                 }
             })
         }
@@ -2459,7 +2793,7 @@ const onMessage = async (msg) => {
                 parse_mode: "HTML",
                 reply_markup: {
                     resize_keyboard: true,
-                    keyboard: getMainKey(chat_id)
+                    keyboard: await getMainKey(chat_id)
                 }
             })
         }
@@ -2480,7 +2814,8 @@ const onMessage = async (msg) => {
             const pid = answerStore[chat_id].product_id 
             const obj = {
                 photo: img,
-                url: msg.caption
+                url: msg.caption,
+                added: chat_id
             }
             await productDB.updateOne({ _id: pid }, { $push: { location: obj } })
             await productDB.updateOne({ _id: pid }, { $set: { active: true } })
@@ -2515,6 +2850,7 @@ export default {
     customOrders,
     support,
     adminPanel,
+    partnerPanel,
     onCallBackQuery,
     onMessage
 }

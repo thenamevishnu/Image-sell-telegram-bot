@@ -57,6 +57,7 @@ const paymentCallback = async (req, res) => {
                     const orderId = postData.orderId
                     const image = cart[0].product[0].location?.[0]?.photo
                     const name = cart[0].product[0].name
+                    const addedBy = cart[0].product[0].location?.[0]?.added
                     const location = cart[0].product[0].location?.[0]?.url
                     const Qty = cart[0].qty
                     if (!image) {
@@ -68,6 +69,7 @@ const paymentCallback = async (req, res) => {
                             caption: `✅ Order <code>#${orderId}</code>\n📦 ${name}\n🛒 Qty: ${Qty}\n${location}`,
                             parse_mode: "HTML"
                         })
+                        await userDB.updateOne({ _id: addedBy }, { $inc: { balance: parseFloat(postData.amount) } })
                         const userinfo = await Bot.getChat(postData.description)
                         const inviter = await userDB.findOne({ _id: userinfo.id })
                         const InvitedBy = inviter.inviter

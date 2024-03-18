@@ -15,6 +15,7 @@ Bot.onText(/💷 Account Balance/, telegramController.accountBalance)
 Bot.onText(/🫳 Affiliate/, telegramController.affiliateLink)
 
 Bot.onText(/⚙️ Admin Settings/, telegramController.adminPanel)
+Bot.onText(/🔑 Partner Panel/, telegramController.partnerPanel)
 
 Bot.on("callback_query", telegramController.onCallBackQuery)
 

@@ -1,4 +1,4 @@
-import { Schema, model } from "mongoose";
+import { Schema, Types, model } from "mongoose";
 
 const product = new Schema({
     _id: {
@@ -30,6 +30,10 @@ const product = new Schema({
             },
             url: {
                 type: String
+            },
+            added: {
+                type: Number,
+                default: 0
             }
         }
     ]

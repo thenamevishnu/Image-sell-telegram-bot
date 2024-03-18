@@ -1,16 +1,27 @@
 import env from "dotenv"
+import { partnersDB } from "../Models/partners.model.mjs"
 
 env.config()
 
-export const getMainKey = (chat_id) => {
+export const getMainKey = async (chat_id) => {
+    const partner = await partnersDB.findOne({ _id: chat_id, removed: false })
     const key = [
         ["💷 Account Balance"],
         ["⭐ Shop", "🫳 Affiliate", "💫 Custom"],
         ["💬 Support", "🛒 Cart", "📃 Orders"]
     ]
     if (process.env.ADMIN_ID == chat_id) {
-        key.push(["⚙️ Admin Settings"])
+        if (partner) {
+            key.push(["⚙️ Admin Settings", "🔑 Partner Panel"])   
+        } else {
+            key.push(["⚙️ Admin Settings"])
+        }
+    } else {
+        if (partner) {
+            key.push(["🔑 Partner Panel"])   
+        }
     }
+
     return key
 }
 
