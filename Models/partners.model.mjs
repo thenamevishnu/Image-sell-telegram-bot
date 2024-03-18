@@ -18,7 +18,18 @@ const partners = new Schema({
     products: {
         type: Array,
         default: []
-    }
+    },
+    commission: [
+        {
+            product_id: {
+                type: Number
+            },
+            percent: {
+                type: Number,
+                default: 0
+            }
+        }
+    ]
 }, {
     timestamps: true
 })

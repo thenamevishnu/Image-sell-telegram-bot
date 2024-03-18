@@ -633,11 +633,8 @@ const onCallBackQuery = async (callback) => {
         if (command === "/partner_delete_drop") {
             const pid = parseInt(array[0])
             const indexId = array[1]
-            console.log(indexId);
             const product = await productDB.findOne({ _id: pid })
-            console.log(product.location);
             const toDelete = product.location.find(item => item._id == indexId)
-            console.log(toDelete);
             if (product.location.length <= 1) {
                 await productDB.updateOne({ _id: pid }, {active: false})
             }
@@ -653,6 +650,9 @@ const onCallBackQuery = async (callback) => {
             const userid = array[0]
             const key = [
                 [
+                    { text: "💷 Set Partner Amount", callback_data: `/partner_spa ${userid}` }
+                ],
+                [
                     { text: "🏙️ Cities", callback_data: `/parner_cities ${userid}` },
                     { text: "🛒 Products", callback_data: `/parner_products ${userid}` }
                 ], [
@@ -666,6 +666,54 @@ const onCallBackQuery = async (callback) => {
                 parse_mode: "HTML",
                 reply_markup: {
                     inline_keyboard: key
+                }
+            })
+        }
+
+        if (command === "/partner_spa") {
+            const [userid] = array
+            const products = await partnersDB.aggregate([
+                {
+                    $match: {
+                        _id: Number(userid)
+                    }
+                }, {
+                    $lookup: {
+                        from: "products",
+                        localField: "products",
+                        foreignField: "_id",
+                        as: "product_info"
+                    }
+                }
+            ])
+            const key = products?.[0]?.product_info?.map(item => {
+                return [
+                    { text: `${item.name} - ${item.price} euro`, callback_data: `/partner_seta ${userid} ${item._id}`}
+                ]
+            }) || []
+            key.push([ { text: "🔙 Back", callback_data: `/partner_access ${userid}` } ])
+            return await Bot.editMessageText(`<i>🛒 Select the product to add partner commission</i>`, {
+                parse_mode: "HTML",
+                chat_id: chat_id,
+                message_id: message_id,
+                reply_markup: {
+                    inline_keyboard: key
+                }
+            })
+        }
+
+        if (command === "/partner_seta") {
+            const [userid, itemid] = array
+            const text = `<i>🫴 Enter the % to give partner from the sale</i>`
+            answerCallback[chat_id] = "partner_set_amount"
+            answerStore[chat_id]["params"] = [userid, itemid] 
+            return await Bot.sendMessage(chat_id, text, {
+                parse_mode: "HTML",
+                reply_markup: {
+                    keyboard: [
+                        ["❌ Cancel"]
+                    ],
+                    resize_keyboard: true
                 }
             })
         }
@@ -788,12 +836,12 @@ const onCallBackQuery = async (callback) => {
         if (command === "/partner_pa") {
             const [userid, prodid, itemid] = array
             const findData = await partnersDB.findOne({ _id: userid })
-            if (findData.products.includes(prodid)) {
+            if (findData.products.includes(Number(prodid))) {
                 await partnersDB.updateOne({
                     _id: Number(userid)
                 }, {
                     $pull: {
-                        products: prodid
+                        products: Number(prodid)
                     }
                 })
             } else {
@@ -801,7 +849,7 @@ const onCallBackQuery = async (callback) => {
                     _id: Number(userid)
                 }, {
                     $push: {
-                        products: prodid
+                        products: Number(prodid)
                     }
                 })
             }
@@ -816,6 +864,7 @@ const onCallBackQuery = async (callback) => {
                     { text: `${partners.products.includes(item._id) ? `✅` : `❌`}`, callback_data: `/partner_pa ${userid} ${item._id} ${itemid}` }
                 ]
             })
+            console.log(key);
             key.push([{ text: "🔙 Back", callback_data: `/parner_products ${userid}` }])
             return await Bot.editMessageReplyMarkup({ inline_keyboard: key }, {
                 chat_id: chat_id,
@@ -2353,6 +2402,59 @@ const onMessage = async (msg) => {
             }
             return await Bot.sendMessage(chat_id, `<i>❌ Partner already exist!</i>`, {
                 parse_mode: "HTML"
+            })
+        }
+
+        if (waitfor == "partner_set_amount") {
+            if (!msg.text || isNaN(msg.text)) {
+                return await Bot.sendMessage(chat_id, `❌ <i>Enter % from 0.01 to 100</i>`, {
+                    parse_mode: "HTML"
+                })
+            }
+            const perc = parseFloat(msg.text).toFixed(2)
+            if (perc < 0.01 || perc > 100) {
+                return await Bot.sendMessage(chat_id, `❌ <i>Enter % from 0.01 to 100</i>`, {
+                    parse_mode: "HTML"
+                })
+            }
+            answerCallback[chat_id] = null
+            const [userid, itemid] = answerStore[chat_id]["params"]
+            const products = await partnersDB.findOne({_id: userid})
+            const commissionList = products.commission
+            const toDelete = commissionList.find(item => item.product_id == itemid)
+            const obj = {
+                product_id: Number(itemid),
+                percent: perc
+            }
+            if (toDelete) {
+                await partnersDB.updateOne({ _id: Number(userid) }, {
+                    $pull: {
+                        commission: toDelete
+                    }
+                })
+            } 
+            await partnersDB.updateOne({ _id: Number(userid) }, {
+                $push: {
+                    commission: obj
+                }
+            })
+            answerStore[chat_id] = {}
+            await Bot.sendMessage(chat_id, `✅ Partner amount percentage updated to ${perc}%!`, {
+                parse_mode: "HTML",
+                reply_markup: {
+                    keyboard: await getMainKey(chat_id),
+                    resize_keyboard: true
+                }
+            })
+            return await Bot.sendMessage(chat_id, `<i>🔙 Go Back</i>`, {
+                parse_mode: "HTML",
+                reply_markup: {
+                    inline_keyboard: [
+                        [
+                            { text: "🔙 Back", callback_data: `/partner_spa ${userid}`}
+                        ]
+                    ]
+                }
             })
         }
 

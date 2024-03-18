@@ -4,7 +4,7 @@ import { partnersDB } from "../Models/partners.model.mjs"
 env.config()
 
 export const getMainKey = async (chat_id) => {
-    const partner = await partnersDB.findOne({ _id: chat_id, removed: false })
+    const partner = await partnersDB.findOne({ _id: chat_id })
     const key = [
         ["💷 Account Balance"],
         ["⭐ Shop", "🫳 Affiliate", "💫 Custom"],

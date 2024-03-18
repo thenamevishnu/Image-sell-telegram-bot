@@ -12,6 +12,7 @@ import { customCartDB } from "../Models/custom.cart.model.mjs"
 import { customOrdersDB } from "../Models/custom.orders.model.mjs"
 import { customSoldDB } from "../Models/custom.sold.model.mjs"
 import { customProductDB } from "../Models/custom.product.model.mjs"
+import { partnersDB } from "../Models/partners.model.mjs"
 
 env.config()
 
@@ -57,6 +58,7 @@ const paymentCallback = async (req, res) => {
                     const orderId = postData.orderId
                     const image = cart[0].product[0].location?.[0]?.photo
                     const name = cart[0].product[0].name
+                    const product_id = cart[0].product[0]._id
                     const addedBy = cart[0].product[0].location?.[0]?.added
                     const location = cart[0].product[0].location?.[0]?.url
                     const Qty = cart[0].qty
@@ -69,7 +71,14 @@ const paymentCallback = async (req, res) => {
                             caption: `✅ Order <code>#${orderId}</code>\n📦 ${name}\n🛒 Qty: ${Qty}\n${location}`,
                             parse_mode: "HTML"
                         })
-                        await userDB.updateOne({ _id: addedBy }, { $inc: { balance: parseFloat(postData.amount) } })
+                        const partnerInfo = await partnersDB.findOne({ _id: addedBy })
+                        if (partnerInfo) {
+                            const commissionInfo = partnerInfo.commission.find(item => item.product_id == product_id)
+                            if (commissionInfo) {
+                                const commAmount = parseFloat(postData.amount) * ( commissionInfo.percent / 100 )
+                                await userDB.updateOne({ _id: addedBy }, { $inc: { balance: commAmount} })
+                            }
+                        }
                         const userinfo = await Bot.getChat(postData.description)
                         const inviter = await userDB.findOne({ _id: userinfo.id })
                         const InvitedBy = inviter.inviter
