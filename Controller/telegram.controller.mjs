@@ -686,9 +686,12 @@ const onCallBackQuery = async (callback) => {
                     }
                 }
             ])
+            const partner = await partnersDB.findOne({ _id: userid })
             const key = products?.[0]?.product_info?.map(item => {
+                const itemPerc = partner.commission.find(items => items.product_id == item?._id)
                 return [
-                    { text: `${item.name} - ${item.price} euro`, callback_data: `/partner_seta ${userid} ${item._id}`}
+                    { text: `${item.name} - ${item.price} euro`, callback_data: `/partner_seta ${userid} ${item._id}` },
+                    { text: `${itemPerc?.percent || 0}%`, callback_data: `/partner_seta ${userid} ${item._id}`}
                 ]
             }) || []
             key.push([ { text: "🔙 Back", callback_data: `/partner_access ${userid}` } ])

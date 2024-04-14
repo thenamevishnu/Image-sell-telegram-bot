@@ -55,77 +55,82 @@ const paymentCallback = async (req, res) => {
                             }
                         }
                     ])
-                    const orderId = postData.orderId
-                    const image = cart[0].product[0].location?.[0]?.photo
-                    const name = cart[0].product[0].name
-                    const product_id = cart[0].product[0]._id
-                    const addedBy = cart[0].product[0].location?.[0]?.added
-                    const location = cart[0].product[0].location?.[0]?.url
-                    const Qty = cart[0].qty
-                    if (!image) {
-                        await Bot.sendMessage(postData.description, `<i>✖️ There is no drop available. Contact admin!</i>`, {
-                            parse_mode: "HTML"
-                        })
-                    } else {
-                        await Bot.sendPhoto(postData.description, image, {
-                            caption: `✅ Order <code>#${orderId}</code>\n📦 ${name}\n🛒 Qty: ${Qty}\n${location}`,
-                            parse_mode: "HTML"
-                        })
-                        const partnerInfo = await partnersDB.findOne({ _id: addedBy })
-                        if (partnerInfo) {
-                            const commissionInfo = partnerInfo.commission.find(item => item.product_id == product_id)
-                            if (commissionInfo) {
-                                const commAmount = parseFloat(postData.amount) * ( commissionInfo.percent / 100 )
-                                await userDB.updateOne({ _id: addedBy }, { $inc: { balance: commAmount} })
+                    const orderId = postData?.orderId
+                    const Qty = cart[0]?.qty
+                    const addedBy = cart[0]?.product?.[0].location?.[0]?.added
+                    const product_id = cart[0]?.product?.[0]._id
+                    for (let i = 0; i < Qty; i++){
+
+                        const image = cart[0]?.product?.[0].location?.[0]?.photo
+                        const name = cart[0]?.product?.[0].name
+                        const location = cart[0]?.product?.[0].location?.[0]?.url
+
+                        if (!image) {
+                            await Bot.sendMessage(postData.description, `<i>✖️ There is no drop available. Contact admin!</i>`, {
+                                parse_mode: "HTML"
+                            })
+                        } else {
+                            await Bot.sendPhoto(postData.description, image, {
+                                caption: `✅ Order <code>#${orderId}</code>\n📦 ${name}\n🛒 Qty: ${Qty}\n${location}`,
+                                parse_mode: "HTML"
+                            })
+                        
+                            const userinfo = await Bot.getChat(postData.description)
+                            const inviter = await userDB.findOne({ _id: userinfo.id })
+                            const InvitedBy = inviter.inviter
+                            if (InvitedBy && InvitedBy != 0) {
+                                const commission = parseFloat(postData.amount) * 0.1
+                                await userDB.updateOne({ _id: InvitedBy }, { $inc: { balance: commission } })
+                                await Bot.sendMessage(InvitedBy, `<i>💷 Referral Income: +${commission} ${postData.currency}</i>`)
                             }
+                            const uname = userinfo.username ? `@${userinfo.username}` : `<a href='tg://user?id=${userinfo.id}'>${userinfo.first_name}</a>`
+                            await Bot.sendPhoto(process.env.ADMIN_ID, image, {
+                                caption: `✅ Sold to ${uname}\n📦 ${name}\n🛒 Qty: ${Qty}\n${location}`,
+                                parse_mode: "HTML"
+                            })
+                            const payment = {
+                                amount: postData.amount,
+                                currency: postData.currency,
+                                orderId: postData.orderId,
+                                date: postData.date,
+                                trackId: postData.trackId,
+                                txID: postData.txID
+                            }
+                            await orderDB.create({
+                                user_id: postData.description,
+                                product_id: cart[0].product_id,
+                                location: {
+                                    photo: image,
+                                    url: location
+                                },
+                                qty: Qty,
+                                payment
+                            })
+                            await soldDB.create({
+                                user_id: postData.description,
+                                neighbourhood: cart[0].product[0].neighbourhood,
+                                name: cart[0].product[0].name,
+                                currency: cart[0].product[0].currency,
+                                price: cart[0].product[0].price,
+                                product_image: cart[0].product[0].product_image,
+                                qty: Qty,
+                                location: {
+                                    photo: image,
+                                    url: location
+                                }
+                            })
+                            await productDB.updateOne({ _id: cart[0].product[0]._id }, { $pull: { location: { photo: image, url: location } } })
                         }
-                        const userinfo = await Bot.getChat(postData.description)
-                        const inviter = await userDB.findOne({ _id: userinfo.id })
-                        const InvitedBy = inviter.inviter
-                        if (InvitedBy && InvitedBy != 0) {
-                            const commission = parseFloat(postData.amount) * 0.1
-                            await userDB.updateOne({ _id: InvitedBy }, { $inc: { balance: commission } })
-                            await Bot.sendMessage(InvitedBy, `<i>💷 Referral Income: +${commission} ${postData.currency}</i>`)
+                    }
+                    const partnerInfo = await partnersDB.findOne({ _id: addedBy })
+                    if (partnerInfo) {
+                        const commissionInfo = partnerInfo.commission.find(item => item.product_id == product_id)
+                        if (commissionInfo) {
+                            const commAmount = parseFloat(postData.amount) * ( commissionInfo.percent / 100 )
+                            await userDB.updateOne({ _id: addedBy }, { $inc: { balance: commAmount} })
                         }
-                        const uname = userinfo.username ? `@${userinfo.username}` : `<a href='tg://user?id=${userinfo.id}'>${userinfo.first_name}</a>`
-                        await Bot.sendPhoto(process.env.ADMIN_ID, image, {
-                            caption: `✅ Sold to ${uname}\n📦 ${name}\n🛒 Qty: ${Qty}\n${location}`,
-                            parse_mode: "HTML"
-                        })
                     }
-                    const payment = {
-                        amount: postData.amount,
-                        currency: postData.currency,
-                        orderId: postData.orderId,
-                        date: postData.date,
-                        trackId: postData.trackId,
-                        txID: postData.txID
-                    }
-                    await orderDB.create({
-                        user_id: postData.description,
-                        product_id: cart[0].product_id,
-                        location: {
-                            photo: image,
-                            url: location
-                        },
-                        qty: Qty,
-                        payment
-                    })
                     await cartDB.deleteOne({ _id: new Types.ObjectId(cartId) })
-                    await soldDB.create({
-                        user_id: postData.description,
-                        neighbourhood: cart[0].product[0].neighbourhood,
-                        name: cart[0].product[0].name,
-                        currency: cart[0].product[0].currency,
-                        price: cart[0].product[0].price,
-                        product_image: cart[0].product[0].product_image,
-                        qty: Qty,
-                        location: {
-                            photo: image,
-                            url: location
-                        }
-                    })
-                    await productDB.updateOne({ _id: cart[0].product[0]._id }, { $pull: { location: { photo: image, url: location } } })
                     const products = await productDB.findOne({ _id: cart[0].product[0]._id })
                     if (products.location.length <= 0) {
                         await productDB.updateOne({ _id: cart[0].product[0]._id }, { $set: {active: false} })
