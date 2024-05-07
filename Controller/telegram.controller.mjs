@@ -105,7 +105,7 @@ const accountBalance = async (msg) => {
         const key = [
             [{text: "📤 Get Paid", callback_data: "/getPaid"},{text: "📃 Payout History", callback_data: "/payoutHistory"}]
         ]
-        const text = `<b>💰 Available Balance: <code>${user.balance.toFixed(6)} BTC</code></b>`
+        const text = `<b>💰 Available Balance: <code>$${user.balance.toFixed(4)}</code></b>`
         return await Bot.sendMessage(msg.chat.id, text, {
             parse_mode: 'HTML',
             reply_markup: {
