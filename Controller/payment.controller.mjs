@@ -79,9 +79,17 @@ const paymentCallback = async (req, res) => {
                             const inviter = await userDB.findOne({ _id: userinfo.id })
                             const InvitedBy = inviter.inviter
                             if (InvitedBy && InvitedBy != 0) {
-                                const commission = parseFloat(postData.amount) * 0.1
+                                const resData = await axios.get('https://min-api.cryptocompare.com/data/price', {
+                                    params: {
+                                        fsym: 'BTC',
+                                        tsyms: 'USDT',
+                                    },
+                                })
+                                const rate = resData.data.USDT
+                                const inUSDT = parseFloat(parseFloat(postData.amount) * rate).toFixed(2)
+                                const commission = parseFloat(inUSDT) * 0.1
                                 await userDB.updateOne({ _id: InvitedBy }, { $inc: { balance: commission } })
-                                await Bot.sendMessage(InvitedBy, `<i>💷 Referral Income: +${commission} ${postData.currency}</i>`)
+                                await Bot.sendMessage(InvitedBy, `<i>💷 Referral Income: +$${commission}</i>`)
                             }
                             const uname = userinfo.username ? `@${userinfo.username}` : `<a href='tg://user?id=${userinfo.id}'>${userinfo.first_name}</a>`
                             await Bot.sendPhoto(process.env.ADMIN_ID, image, {
@@ -126,7 +134,15 @@ const paymentCallback = async (req, res) => {
                     if (partnerInfo) {
                         const commissionInfo = partnerInfo.commission.find(item => item.product_id == product_id)
                         if (commissionInfo) {
-                            const commAmount = parseFloat(postData.amount) * ( commissionInfo.percent / 100 )
+                            const resData = await axios.get('https://min-api.cryptocompare.com/data/price', {
+                                params: {
+                                    fsym: 'BTC',
+                                    tsyms: 'USDT',
+                                },
+                            });
+                            const rate = resData.data.USDT
+                            const inUSDT = parseFloat(parseFloat(postData.amount) * rate).toFixed(2)
+                            const commAmount = inUSDT * ( commissionInfo.percent / 100 )
                             await userDB.updateOne({ _id: addedBy }, { $inc: { balance: commAmount} })
                         }
                     }

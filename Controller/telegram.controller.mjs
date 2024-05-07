@@ -2521,7 +2521,7 @@ const onMessage = async (msg) => {
 
         if (waitfor === "payout") {
             if (!msg.text || isNaN(msg.text)) {
-                const text = `<i>✖️ Enter BTC in numeric value</i>`
+                const text = `<i>✖️ Enter USDT in numeric value</i>`
                 return Bot.sendMessage(chat_id, text, {
                     parse_mode: "HTML"
                 })
@@ -2529,7 +2529,7 @@ const onMessage = async (msg) => {
             const amount = parseFloat(msg.text)
             const user = await userDB.findOne({ _id: chat_id })
             if (amount < botConfig.PAYOUT.MINIMUM || amount > user.balance) {
-                const text = `<i>✖️ Minimum ${botConfig.PAYOUT.MINIMUM.toFixed(6)} BTC & Maximum ${user.balance.toFixed(6)} BTC</i>`
+                const text = `<i>✖️ Minimum $${botConfig.PAYOUT.MINIMUM.toFixed(6)} & Maximum $${user.balance.toFixed(6)}</i>`
                 return Bot.sendMessage(chat_id, text, {
                     parse_mode: "HTML"
                 })
@@ -2550,15 +2550,7 @@ const onMessage = async (msg) => {
                 })
             }
             const address = msg.text
-            const amount = answerStore[chat_id].amount
-            const resData = await axios.get('https://min-api.cryptocompare.com/data/price', {
-                params: {
-                    fsym: 'BTC',
-                    tsyms: 'USDT',
-                },
-            });
-            const rate = resData.data.USDT
-            const inUSDT = parseFloat(amount * rate).toFixed(2)
+            const inUSDT = answerStore[chat_id].amount
             answerCallback[chat_id] = null
             await Bot.sendMessage(chat_id, `<i>⌛ Creating payout...</i>`, {
                 parse_mode: "HTML"
@@ -2567,7 +2559,7 @@ const onMessage = async (msg) => {
             if (payStatus) {
                 await userDB.updateOne({ _id: chat_id }, { $inc: { balance: -(amount) } })
             }
-            const text = `✅ Payout Requested\n\n💰 ${inUSDT} USDT ( ${amount} BTC ) to ${address}\n\n🛰️ Status: ${payStatus || "Failed"}`
+            const text = `✅ Payout Requested\n\n💰 ${inUSDT} USDT to ${address}\n\n🛰️ Status: ${payStatus || "Failed"}`
             const key = await getMainKey(chat_id)
             return await Bot.sendMessage(chat_id, text, {
                 parse_mode: "HTML",
