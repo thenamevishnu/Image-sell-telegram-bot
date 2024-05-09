@@ -22,6 +22,10 @@ const user = new Schema({
     balance: {
         type: Number,
         default: 0
+    },
+    inUSD: {
+        type: Number,
+        default: 0
     }
 },{
     timestamps: true

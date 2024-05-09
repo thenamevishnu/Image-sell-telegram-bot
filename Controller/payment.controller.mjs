@@ -13,6 +13,7 @@ import { customOrdersDB } from "../Models/custom.orders.model.mjs"
 import { customSoldDB } from "../Models/custom.sold.model.mjs"
 import { customProductDB } from "../Models/custom.product.model.mjs"
 import { partnersDB } from "../Models/partners.model.mjs"
+import axios from "axios"
 
 env.config()
 

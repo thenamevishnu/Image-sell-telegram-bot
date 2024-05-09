@@ -1,4 +1,6 @@
+import axios from "axios";
 import telegramController from "../Controller/telegram.controller.mjs";
+import { userDB } from "../Models/user.model.mjs";
 import Bot from "./Config.mjs";
 
 Bot.onText(/\/start(?: (.+))?|🔙 Back/, telegramController.start)
