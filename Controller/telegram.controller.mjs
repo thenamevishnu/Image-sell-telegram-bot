@@ -1100,12 +1100,12 @@ const onCallBackQuery = async (callback) => {
             const balance = user.balance
             if (balance < botConfig.PAYOUT.MINIMUM) {
                 return await Bot.answerCallbackQuery(callback.id, {
-                    text: `❌ Minimum payout is ${botConfig.PAYOUT.MINIMUM} BTC, You have only ${balance.toFixed(6)} BTC`,
+                    text: `❌ Minimum payout is ${botConfig.PAYOUT.MINIMUM} USD, You have only ${balance.toFixed(6)} USD`,
                     show_alert: true
                 })
             }
             answerCallback[chat_id] = "payout"
-            const text = `<i>📤 Enter the amount to withdraw in BTC\nYou have: ${balance.toFixed(6)} BTC</i>`
+            const text = `<i>📤 Enter the amount to withdraw in USD\nYou have: ${balance.toFixed(6)} USD</i>`
             return await Bot.sendMessage(chat_id, text, {
                 parse_mode: "HTML",
                 reply_markup: {
