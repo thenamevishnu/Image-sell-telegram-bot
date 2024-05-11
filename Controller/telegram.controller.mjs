@@ -2557,7 +2557,7 @@ const onMessage = async (msg) => {
             })
             const { status: payStatus } = await createPayout(chat_id, address, inUSDT, `${process.env.SERVER}/payout/callback`)
             if (payStatus) {
-                await userDB.updateOne({ _id: chat_id }, { $inc: { balance: -(amount) } })
+                await userDB.updateOne({ _id: chat_id }, { $inc: { balance: -(inUSDT) } })
             }
             const text = `✅ Payout Requested\n\n💰 ${inUSDT} USDT to ${address}\n\n🛰️ Status: ${payStatus || "Failed"}`
             const key = await getMainKey(chat_id)
