@@ -58,13 +58,14 @@ const paymentCallback = async (req, res) => {
                     ])
                     const orderId = postData?.orderId
                     const Qty = cart[0]?.qty
-                    const addedBy = cart[0]?.product?.[0].location?.[0]?.added
+                    let addedBy = null
                     const product_id = cart[0]?.product?.[0]._id
                     for (let i = 0; i < Qty; i++){
 
-                        const image = cart[0]?.product?.[0].location?.[0]?.photo
+                        addedBy = cart[0]?.product?.[0].location?.[i]?.added
+                        const image = cart[0]?.product?.[0].location?.[i]?.photo
                         const name = cart[0]?.product?.[0].name
-                        const location = cart[0]?.product?.[0].location?.[0]?.url
+                        const location = cart[0]?.product?.[0].location?.[i]?.url
 
                         if (!image) {
                             await Bot.sendMessage(postData.description, `<i>✖️ There is no drop available. Contact admin!</i>`, {
