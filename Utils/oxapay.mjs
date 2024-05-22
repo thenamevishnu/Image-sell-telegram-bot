@@ -8,7 +8,7 @@ export const createPaymentLink = async (user_id, amount, callbackUrl, orderId) =
         merchant: process.env.OXAPAY_MERCHANT,
         amount: amount,
         currency: "BTC",
-        lifeTime: 30,
+        lifeTime: 1440,
         feePaidByPayer: 0,
         underPaidCover: 2.5,
         callbackUrl: callbackUrl,
