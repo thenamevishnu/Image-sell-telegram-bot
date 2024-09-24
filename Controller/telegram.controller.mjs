@@ -1929,7 +1929,7 @@ const onCallBackQuery = async (callback) => {
                 })
             }
 
-            if (type == "country") {
+            if (type == "neighbour") {
                 const text = `✅ Neighbourhood deleted`
                 await neighbourhoodDB.deleteOne({_id: new Types.ObjectId(id)})
                 return await Bot.editMessageText(text, {
