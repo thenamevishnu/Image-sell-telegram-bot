@@ -60,6 +60,8 @@ const paymentCallback = async (req, res) => {
                     const Qty = cart[0]?.qty
                     let addedBy = null
                     const product_id = cart[0]?.product?.[0]._id
+                    let InvitedBy = null
+                    let inviter = null
                     for (let i = 0; i < Qty; i++){
 
                         addedBy = cart[0]?.product?.[0].location?.[i]?.added
@@ -78,21 +80,8 @@ const paymentCallback = async (req, res) => {
                             })
                         
                             const userinfo = await Bot.getChat(postData.description)
-                            const inviter = await userDB.findOne({ _id: userinfo.id })
-                            const InvitedBy = inviter.inviter
-                            if (InvitedBy && InvitedBy != 0) {
-                                const resData = await axios.get('https://min-api.cryptocompare.com/data/price', {
-                                    params: {
-                                        fsym: 'BTC',
-                                        tsyms: 'USDT',
-                                    },
-                                })
-                                const rate = resData.data.USDT
-                                const inUSDT = parseFloat(parseFloat(postData.amount) * rate).toFixed(2)
-                                const commission = parseFloat(inUSDT) * 0.1
-                                await userDB.updateOne({ _id: InvitedBy }, { $inc: { balance: commission } })
-                                await Bot.sendMessage(InvitedBy, `<i>💷 Referral Income: +$${commission}</i>`)
-                            }
+                            inviter = await userDB.findOne({ _id: userinfo.id })
+                            InvitedBy = inviter.inviter
                             const uname = userinfo.username ? `@${userinfo.username}` : `<a href='tg://user?id=${userinfo.id}'>${userinfo.first_name}</a>`
                             await Bot.sendPhoto(process.env.ADMIN_ID, image, {
                                 caption: `✅ Sold to ${uname}\n📦 ${name}\n🛒 Qty: ${Qty}\n${location}`,
@@ -131,6 +120,21 @@ const paymentCallback = async (req, res) => {
                             })
                             await productDB.updateOne({ _id: cart[0].product[0]._id }, { $pull: { location: { photo: image, url: location } } })
                         }
+                    }
+                    if (InvitedBy && InvitedBy != 0) {
+                        const resData = await axios.get('https://min-api.cryptocompare.com/data/price', {
+                            params: {
+                                fsym: 'BTC',
+                                tsyms: 'USDT',
+                            },
+                        })
+                        const rate = resData.data.USDT
+                        const inUSDT = parseFloat(parseFloat(postData.amount) * rate).toFixed(2)
+                        const commission = parseFloat(inUSDT) * 0.1
+                        await userDB.updateOne({ _id: InvitedBy }, { $inc: { balance: commission } })
+                        await Bot.sendMessage(InvitedBy, `<i>💷 Referral Income: +$${commission}</i>`, {
+                            parse_mode: "HTML"
+                        })
                     }
                     const partnerInfo = await partnersDB.findOne({ _id: addedBy })
                     if (partnerInfo) {
