@@ -11,7 +11,6 @@ import { userDB } from "../Models/user.model.mjs"
 import { customCartDB } from "../Models/custom.cart.model.mjs"
 import { customOrdersDB } from "../Models/custom.orders.model.mjs"
 import { customSoldDB } from "../Models/custom.sold.model.mjs"
-import { customProductDB } from "../Models/custom.product.model.mjs"
 import { partnersDB } from "../Models/partners.model.mjs"
 import axios from "axios"
 
@@ -295,7 +294,7 @@ const payoutCallback = async (req, res) => {
                     const userinfo = await Bot.getChat(postData.description)
                     const uname = userinfo.username ? `@${userinfo.username}` : `<a href='tg://user?id=${userinfo.id}'>${userinfo.first_name}</a>`
 
-                    await Bot.sendMessage(postData.description, `✅ Payout sent to ${uname}\n\n💰 ${postData.amount} ${postData.currency} sent to ${postData.address}\n\n🛰️ TxID: ${postData.txID}`, {
+                    await Bot.sendMessage(process.env.ADMIN_ID, `✅ Payout sent to ${uname}\n\n💰 ${postData.amount} ${postData.currency} sent to ${postData.address}\n\n🛰️ TxID: ${postData.txID}`, {
                         parse_mode: "HTML"
                     })
                 }
