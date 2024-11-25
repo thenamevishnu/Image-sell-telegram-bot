@@ -26,7 +26,7 @@ export const getMainKey = async (chat_id) => {
 }
 
 export const getMainText = () => {
-    return `👾 Welcome to Balenciaga 24/7 Shop.\n\nPay with crypto and receive a location and photo of a pre-dropped package in your city instantly.\n\nCourtesy of @cocobale network by @skgbale`
+    return `👾 Welcome to Balenciaga 24/7 Shop.\n\nPay with crypto and receive a location and photo of a pre-dropped package in your city instantly.\n\nAll verified links can be found at the bale.city website`
 }
 
 export const answerCallback = {}
