@@ -9,7 +9,7 @@ if (maintenance) {
     Bot.on("message", async (msg) => {
         const text = `<i>⚠️ Maintenance Mode\n\nPlease try again later! We will be back soon</i>`
         return await Bot.sendMessage(msg.chat.id, text, {
-            parse_mode: "HTML"
+                parse_mode: "HTML"
         })
     })
 }else{
