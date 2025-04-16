@@ -1547,10 +1547,11 @@ const onCallBackQuery = async (callback) => {
             const orderId = Math.floor(new Date().getTime() / 1000)
             const cartId = cart[0]._id
             const response = await createPaymentLink(chat_id, rateInBTC, `${process.env.SERVER}/payment/callback/${cartId}`, orderId)
-            if (response.result == 100 && response.message == "success") {
+            if (response.status == 200 && response?.data && response.data.payment_url) {
                 const text = `<b>📃 Your order <code>#${orderId}</code> is created:\nTotal: 💵 ${total} ${cart[0].product[0].currency}</b>`
+                console.log(response.data.payment_url);
                 const key = [
-                    [{text: "Pay with crypto", url: response.payLink}]
+                    [{text: "Pay with crypto", url: response.data.payment_url}]
                 ]
                 return await Bot.sendMessage(chat_id, text, {
                     parse_mode: "HTML",
@@ -2555,11 +2556,16 @@ const onMessage = async (msg) => {
             await Bot.sendMessage(chat_id, `<i>⌛ Creating payout...</i>`, {
                 parse_mode: "HTML"
             })
-            const { status: payStatus } = await createPayout(chat_id, address, inUSDT, `${process.env.SERVER}/payout/callback`)
-            if (payStatus) {
+            const response = await createPayout(chat_id, address, inUSDT, `${process.env.SERVER}/payout/callback`)
+            if (response?.err) {
+                return await Bot.sendMessage(chat_id, `<b>❌ ${response.err}</b>`, {
+                    parse_mode: "HTML"
+                })
+            }
+            if (response.status == 200 && response?.data && response.data.status) {
                 await userDB.updateOne({ _id: chat_id }, { $inc: { balance: -(inUSDT) } })
             }
-            const text = `✅ Payout Requested\n\n💰 ${inUSDT} USDT to ${address}\n\n🛰️ Status: ${payStatus || "Failed"}`
+            const text = `✅ Payout Requested\n\n💰 ${inUSDT} USDT to ${address}\n\n🛰️ Status: ${response.data?.status || "Failed"}`
             const key = await getMainKey(chat_id)
             return await Bot.sendMessage(chat_id, text, {
                 parse_mode: "HTML",
